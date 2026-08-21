@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Student } from '../../types';
 import { formatCurrency, formatShortCurrency } from '../../utils/formatters';
+import { exportTuitionStudentsExcel } from '../../utils/excelParser';
+import { TuitionExportModal } from '../finance/TuitionExportModal';
 import {
   Users,
   Search,
@@ -14,7 +16,11 @@ import {
   X,
   ShieldAlert,
   CreditCard,
+  FileSpreadsheet,
+  Download,
+  AlertTriangle,
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 interface StudentManagerProps {
   onOpenPaymentModal: (invoiceId: string) => void;
@@ -35,6 +41,10 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'debt'>('all');
+
+  // Export Modal state
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportInitialType, setExportInitialType] = useState<'all' | 'paid' | 'debt'>('all');
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -223,24 +233,37 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             <span>QUẢN LÝ HỌC SINH & ĐĂNG KÝ MÔN HỌC</span>
           </h1>
           <p className="text-xs lg:text-sm text-slate-500 mt-0.5">
-            Cơ sở dữ liệu tập trung toàn bộ khối (K6, K7, K8, K9) với tự động tính học phí theo môn
+            Cơ sở dữ liệu tập trung toàn bộ khối (K6, K7, K8, K9) với tự động tính học phí theo môn & xuất báo cáo
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs lg:text-sm font-semibold shadow-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Thêm Học Sinh Mới</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setExportInitialType('all');
+              setIsExportModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs lg:text-sm font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Xuất Excel Danh Sách</span>
+          </button>
+
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs lg:text-sm font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Thêm Học Sinh Mới</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
-        {/* Row 1: Grade Tabs & Quick Stats */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+      <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+        {/* Row 1: Grade Tabs & Quick Stats & Fast Export */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
             {[
               { id: 'all', label: 'Tất Cả Khối', count: students.length },
               { id: 6, label: 'Khối 6', count: students.filter((s) => s.grade === 6).length },
@@ -251,7 +274,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
               <button
                 key={tab.id}
                 onClick={() => setSelectedGrade(tab.id as any)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   selectedGrade === tab.id
                     ? 'bg-indigo-600 text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
@@ -263,17 +286,55 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             ))}
           </div>
 
-          <div className="text-xs text-slate-500 flex items-center gap-3">
-            <span>
-              Tổng số hiển thị: <strong className="text-slate-800">{filtered.length}</strong> học sinh
-            </span>
-            <span className="hidden sm:inline text-slate-300">•</span>
-            <span className="hidden sm:inline">
-              Công nợ khối:{' '}
-              <strong className="text-rose-600">
-                {formatCurrency(filtered.reduce((acc, s) => acc + s.remainingDebt, 0))}
-              </strong>
-            </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-xs text-slate-500 hidden sm:flex items-center gap-3">
+              <span>
+                Tổng hiển thị: <strong className="text-slate-800">{filtered.length}</strong> HS
+              </span>
+              <span className="text-slate-300">•</span>
+              <span>
+                Công nợ:{' '}
+                <strong className="text-rose-600">
+                  {formatCurrency(filtered.reduce((acc, s) => acc + s.remainingDebt, 0))}
+                </strong>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+              <button
+                onClick={() => {
+                  exportTuitionStudentsExcel(students, invoices, {
+                    filterType: 'paid',
+                    grade: selectedGrade,
+                    month: 8,
+                    year: 2026,
+                  });
+                  confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
+                }}
+                title="Tải ngay danh sách học sinh đã đóng đủ tiền"
+                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Xuất Đã Thu</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  exportTuitionStudentsExcel(students, invoices, {
+                    filterType: 'debt',
+                    grade: selectedGrade,
+                    month: 8,
+                    year: 2026,
+                  });
+                  confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
+                }}
+                title="Tải ngay danh sách học sinh còn nợ tiền"
+                className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                <span>Xuất Còn Nợ</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -815,6 +876,13 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
           </div>
         </div>
       )}
+
+      {/* Tuition Export Modal */}
+      <TuitionExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        initialType={exportInitialType}
+      />
     </div>
   );
 };

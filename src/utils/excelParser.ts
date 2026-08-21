@@ -627,3 +627,157 @@ export const generateCenterExcelExport = (
   XLSX.writeFile(workbook, fileName);
 };
 
+export interface TuitionExportOptions {
+  filterType: 'all' | 'paid' | 'debt' | 'partial';
+  grade?: number | 'all';
+  month?: number;
+  year?: number;
+  fileName?: string;
+}
+
+/**
+ * Xuất danh sách học sinh theo trạng thái đóng tiền / đã thu / còn nợ với đầy đủ bảng tính chuyên nghiệp
+ */
+export const exportTuitionStudentsExcel = (
+  students: Student[],
+  invoices: InvoiceRecord[],
+  options: TuitionExportOptions = { filterType: 'all', grade: 'all' }
+) => {
+  const workbook = XLSX.utils.book_new();
+  const { filterType, grade = 'all', month = 8, year = 2026 } = options;
+
+  // Filter students based on grade
+  let targetStudents = grade === 'all' ? students : students.filter((s) => s.grade === grade);
+
+  // Filter lists
+  const paidStudents = targetStudents.filter((s) => s.remainingDebt === 0 && s.totalTuitionDue > 0);
+  const debtStudents = targetStudents.filter((s) => s.remainingDebt > 0);
+  const partialStudents = targetStudents.filter((s) => s.totalPaid > 0 && s.remainingDebt > 0);
+  const unpaidStudents = targetStudents.filter((s) => s.totalPaid === 0 && s.totalTuitionDue > 0);
+
+  // Summary Metrics
+  const totalRevenue = targetStudents.reduce((sum, s) => sum + s.totalTuitionDue, 0);
+  const totalCollected = targetStudents.reduce((sum, s) => sum + s.totalPaid, 0);
+  const totalDebtAmount = targetStudents.reduce((sum, s) => sum + s.remainingDebt, 0);
+  const collectionRate = totalRevenue > 0 ? ((totalCollected / totalRevenue) * 100).toFixed(1) : '100';
+
+  // 1. SHEET TỔNG QUAN TÀI CHÍNH
+  const summaryRows = [
+    { 'Chỉ tiêu thống kê học phí': 'Trung tâm', 'Số liệu': 'AN TÂM EDUCATION' },
+    { 'Chỉ tiêu thống kê học phí': 'Kỳ thu học phí', 'Số liệu': `Tháng ${month}/${year}` },
+    { 'Chỉ tiêu thống kê học phí': 'Phân loại khối', 'Số liệu': grade === 'all' ? 'Tất cả các khối (K6, K7, K8, K9)' : `Khối ${grade}` },
+    { 'Chỉ tiêu thống kê học phí': 'Tổng số học sinh', 'Số liệu': `${targetStudents.length} học sinh` },
+    { 'Chỉ tiêu thống kê học phí': 'Học sinh ĐÃ ĐÓNG ĐỦ 100%', 'Số liệu': `${paidStudents.length} học sinh (${((paidStudents.length / (targetStudents.length || 1)) * 100).toFixed(1)}%)` },
+    { 'Chỉ tiêu thống kê học phí': 'Học sinh CÒN NỢ HỌC PHÍ', 'Số liệu': `${debtStudents.length} học sinh (${((debtStudents.length / (targetStudents.length || 1)) * 100).toFixed(1)}%)` },
+    { 'Chỉ tiêu thống kê học phí': 'Trong đó: Đã đóng tạm ứng 1 phần', 'Số liệu': `${partialStudents.length} học sinh` },
+    { 'Chỉ tiêu thống kê học phí': 'Trong đó: Chưa đóng đồng nào', 'Số liệu': `${unpaidStudents.length} học sinh` },
+    { 'Chỉ tiêu thống kê học phí': 'TỔNG DOANH THU PHẢI THU (VNĐ)', 'Số liệu': totalRevenue.toLocaleString('vi-VN') + ' đ' },
+    { 'Chỉ tiêu thống kê học phí': 'TỔNG ĐÃ THU THỰC TẾ (VNĐ)', 'Số liệu': totalCollected.toLocaleString('vi-VN') + ' đ' },
+    { 'Chỉ tiêu thống kê học phí': 'TỔNG CÔNG NỢ CÒN LẠI (VNĐ)', 'Số liệu': totalDebtAmount.toLocaleString('vi-VN') + ' đ' },
+    { 'Chỉ tiêu thống kê học phí': 'TỶ LỆ THU HỒI HỌC PHÍ', 'Số liệu': `${collectionRate}%` },
+    { 'Chỉ tiêu thống kê học phí': 'Thời gian xuất báo cáo', 'Số liệu': new Date().toLocaleString('vi-VN') },
+  ];
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), '1. TỔNG HỢP CÔNG NỢ');
+
+  // 2. SHEET HỌC SINH ĐÃ ĐÓNG TIỀN (ĐÃ THU ĐỦ)
+  if (filterType === 'all' || filterType === 'paid') {
+    const paidRows = paidStudents.map((st, index) => {
+      const inv = invoices.find((i) => i.studentCode === st.code);
+      const lastTx = inv?.paymentHistory && inv.paymentHistory.length > 0 ? inv.paymentHistory[inv.paymentHistory.length - 1] : null;
+      return {
+        'STT': index + 1,
+        'Mã học sinh': st.code,
+        'Họ và tên học sinh': st.fullName,
+        'Khối': `Khối ${st.grade}`,
+        'Lớp': st.className,
+        'Môn học đã đăng ký': st.enrollments.map((e) => e.subjectName).join(', '),
+        'Trường đang học': st.currentSchool,
+        'Phụ huynh học sinh': st.parentName,
+        'Số điện thoại phụ huynh': st.parentPhone,
+        'Số điện thoại HS': st.phone || '',
+        'Tổng học phí (VNĐ)': st.totalTuitionDue,
+        'Số tiền đã thu (VNĐ)': st.totalPaid,
+        'Còn nợ (VNĐ)': 0,
+        'Trạng thái': 'ĐÃ HOÀN TẤT (100%)',
+        'Hình thức đóng': lastTx?.method === 'bank_transfer' ? 'Chuyển khoản' : 'Tiền mặt',
+        'Ngày nộp': lastTx?.paymentDate || inv?.createdAt || '2026-08-05',
+        'Ghi chú': st.notes || '',
+      };
+    });
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(paidRows.length > 0 ? paidRows : [{ 'Thông báo': 'Chưa có dữ liệu học sinh đã nộp đủ' }]),
+      '2. DS ĐÃ ĐÓNG TIỀN'
+    );
+  }
+
+  // 3. SHEET HỌC SINH CÒN NỢ TIỀN (CHƯA THU / ĐÓNG THIẾU)
+  if (filterType === 'all' || filterType === 'debt' || filterType === 'partial') {
+    const debtRows = debtStudents.map((st, index) => {
+      const inv = invoices.find((i) => i.studentCode === st.code);
+      const isPartial = st.totalPaid > 0;
+      return {
+        'STT': index + 1,
+        'Mã học sinh': st.code,
+        'Họ và tên học sinh': st.fullName,
+        'Khối': `Khối ${st.grade}`,
+        'Lớp': st.className,
+        'Môn học': st.enrollments.map((e) => e.subjectName).join(', '),
+        'Phụ huynh': st.parentName,
+        'Số điện thoại phụ huynh (Gọi/Zalo)': st.parentPhone,
+        'Số điện thoại HS': st.phone || '',
+        'Tổng học phí (VNĐ)': st.totalTuitionDue,
+        'Đã nộp tạm ứng (VNĐ)': st.totalPaid,
+        'SỐ TIỀN CÒN NỢ (VNĐ)': st.remainingDebt,
+        'Phân loại nợ': isPartial ? 'Đóng thiếu một phần' : 'Chưa nộp đồng nào',
+        'Hạn thanh toán': inv?.dueDate || '2026-08-15',
+        'Tình trạng': inv?.status === 'overdue' ? 'QUÁ HẠN' : 'CHỜ THANH TOÁN',
+        'Mẫu tin nhắn nhắc Zalo': `AN TAM EDU nhắc học phí em ${st.fullName} (${st.code}): Còn nợ ${st.remainingDebt.toLocaleString('vi-VN')}đ. Hạn nộp: ${inv?.dueDate || '15/08/2026'}. STK: 0988112201 MBBank`,
+      };
+    });
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(debtRows.length > 0 ? debtRows : [{ 'Thông báo': 'Không có học sinh nào còn nợ tiền' }]),
+      '3. DS CÒN NỢ HỌC PHÍ'
+    );
+  }
+
+  // 4. SHEET CHI TIẾT TỪNG KHỐI (K6, K7, K8, K9)
+  [6, 7, 8, 9].forEach((g) => {
+    if (grade === 'all' || grade === g) {
+      const gStudents = targetStudents.filter((s) => s.grade === g);
+      if (gStudents.length > 0) {
+        const gRows = gStudents.map((st, idx) => ({
+          'STT': idx + 1,
+          'Mã HS': st.code,
+          'Họ và tên': st.fullName,
+          'Lớp': st.className,
+          'Phụ huynh': st.parentName,
+          'SĐT Phụ huynh': st.parentPhone,
+          'Môn học': st.enrollments.map((e) => e.subjectName).join(', '),
+          'Tổng học phí': st.totalTuitionDue,
+          'Đã thu': st.totalPaid,
+          'Còn nợ': st.remainingDebt,
+          'Tình trạng': st.remainingDebt === 0 ? 'Đã thu đủ' : st.totalPaid > 0 ? 'Đóng thiếu' : 'Chưa thu',
+        }));
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(gRows), `CHI TIẾT KHỐI ${g}`);
+      }
+    }
+  });
+
+  // Determine output file name
+  let defaultFileName = 'AN_TAM_BAO_CAO_HOC_PHI_TOAN_TRUNG_TAM.xlsx';
+  if (filterType === 'paid') {
+    defaultFileName = `AN_TAM_DS_HS_DA_DONG_TIEN_${grade !== 'all' ? `KHOI_${grade}` : 'TAT_CA'}.xlsx`;
+  } else if (filterType === 'debt') {
+    defaultFileName = `AN_TAM_DS_HS_CON_NO_HOC_PHI_${grade !== 'all' ? `KHOI_${grade}` : 'TAT_CA'}.xlsx`;
+  } else if (grade !== 'all') {
+    defaultFileName = `AN_TAM_BAO_CAO_HOC_PHI_KHOI_${grade}.xlsx`;
+  }
+
+  const finalName = options.fileName || defaultFileName;
+  XLSX.writeFile(workbook, finalName);
+  return finalName;
+};
+
+
