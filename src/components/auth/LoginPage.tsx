@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { UserRole, AuthUser } from '../../types';
 import {
@@ -46,6 +46,104 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const [activeTab, setActiveTab] = useState<'login' | 'parent_lookup' | 'register'>('login');
   const [selectedRoleType, setSelectedRoleType] = useState<UserRole>('SUPER_ADMIN');
+  
+  // Slides configuration for Login Page Carousel
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  const loginSlides = [
+    {
+      title: "Phân Hệ Giáo Viên",
+      subtitle: "Soạn Bài & Điểm Danh",
+      description: "Hệ thống hỗ trợ giáo viên xây dựng ngân hàng đề thi chuẩn hóa bám sát Bộ GD, chấm điểm và báo cáo tiến trình học tập của từng học viên.",
+      icon: <Briefcase className="w-5 h-5 text-emerald-400" />,
+      badge: "Học Vụ Thông Minh",
+      badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      preview: (
+        <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 space-y-3 shadow-md">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Sổ Điểm Danh Lớp Toán K9
+            </span>
+            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full font-bold border border-emerald-500/20">Ca dạy: 08:00</span>
+          </div>
+          <div className="space-y-1.5 text-[11px]">
+            <div className="p-1.5 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between">
+              <span className="text-slate-300 font-medium">1. Nguyễn Hoàng Nam</span>
+              <span className="text-emerald-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded-md border border-emerald-500/10">Hiện diện (8:02)</span>
+            </div>
+            <div className="p-1.5 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between">
+              <span className="text-slate-300 font-medium">2. Trần Minh Anh</span>
+              <span className="text-amber-400 font-bold bg-amber-500/5 px-2 py-0.5 rounded-md border border-amber-500/10">Vào trễ (8:15)</span>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Quản Trị Tài Chính",
+      subtitle: "Giao Dịch VietQR Tự Động",
+      description: "Tự động phát hành mã VietQR học phí cá nhân hóa cho từng phụ huynh. Nhận thông báo giao dịch gạch nợ tự động trong 1 giây mà không cần đối soát thủ công.",
+      icon: <CreditCard className="w-5 h-5 text-indigo-400" />,
+      badge: "Tự Động Hóa 100%",
+      badgeClass: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+      preview: (
+        <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 space-y-3 shadow-md">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              Giao dịch học phí tháng 8
+            </span>
+            <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full font-bold border border-indigo-500/20">VietQR Sync</span>
+          </div>
+          <div className="space-y-2 text-[11px]">
+            <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between">
+              <div>
+                <div className="font-bold text-emerald-400">+1,500,000 đ</div>
+                <div className="text-[9px] text-slate-500">Học phí T8 • Em Hà An (K8)</div>
+              </div>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[9px] font-bold">Khớp lệnh 1s</span>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Sổ Liên Lạc 24/7",
+      subtitle: "Đồng Hành Cùng Phụ Huynh",
+      description: "Xem tức thời kết quả chuyên cần, điểm kiểm tra chi tiết, và lời phê sát sao của giáo viên bộ môn qua Zalo/Sổ liên lạc điện tử mà không cần cài đặt phức tạp.",
+      icon: <HeartHandshake className="w-5 h-5 text-amber-400" />,
+      badge: "Phản Hồi Hai Chiều",
+      badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+      preview: (
+        <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 space-y-3 shadow-md">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              Sổ nhận xét điện tử
+            </span>
+            <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full font-bold border border-amber-500/20">Mới nhất</span>
+          </div>
+          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800/60 text-left space-y-1">
+            <div className="flex items-center justify-between font-bold text-amber-400 text-[11px]">
+              <span>Nhận xét: em Lâm Bảo (K9)</span>
+              <span>10/10đ</span>
+            </div>
+            <p className="text-[10px] text-slate-400 leading-normal">
+              "Con hiểu bài nhanh, giải tốt các bài toán hình học nâng cao. Rất năng nổ đóng góp xây dựng bài."
+            </p>
+          </div>
+        </div>
+      )
+    }
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % loginSlides.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
   
   // Login form state
   const [identifier, setIdentifier] = useState('admin');
@@ -256,72 +354,77 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       <main className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-10 my-auto">
         <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           
-          {/* Left Column: Branding & System Highlights (5 cols) */}
-          <div className="lg:col-span-5 space-y-6 text-left hidden lg:block">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Nền Tảng Quản Trị Giáo Dục Toàn Diện</span>
-            </div>
-
-            <div className="space-y-2">
-              <h1 className="text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
-                Tâm Sáng Chí Bền,<br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400">
-                  Vững Bước Tương Lai
-                </span>
-              </h1>
-              <p className="text-xs lg:text-sm text-slate-400 leading-relaxed">
-                Đăng nhập phân quyền chuyên biệt cho Ban Quản Trị, Giáo Viên Bộ Môn, Kế Toán, Trợ Giảng và Cổng Phụ Huynh tra cứu sổ liên lạc.
-              </p>
-            </div>
-
-            {/* Value Props List */}
-            <div className="space-y-3 pt-2">
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0">
-                  <Briefcase className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-200">Không Gian Làm Việc Giáo Viên</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Điểm danh ca dạy, chấm bài LMS, soạn giáo án & đề kiểm tra AI chuẩn Bộ GD.
-                  </p>
-                </div>
+          {/* Left Column: Branding & System Highlights Carousel (5 cols) */}
+          <div className="lg:col-span-5 flex flex-col justify-between h-full min-h-[500px] hidden lg:flex text-left space-y-6">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Nền Tảng Quản Trị Giáo Dục Toàn Diện</span>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-200">Quản Trị Tài Chính & CRM Tự Động</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Xuất biên lai QR VietQR, theo dõi công nợ, quản lý tuyển sinh và học phí.
-                  </p>
-                </div>
+              <div className="space-y-2">
+                <h1 className="text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
+                  Tâm Sáng Chí Bền,<br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400">
+                    Vững Bước Tương Lai
+                  </span>
+                </h1>
+                <p className="text-xs lg:text-sm text-slate-400 leading-relaxed">
+                  Đăng nhập phân quyền chuyên biệt cho Ban Quản Trị, Giáo Viên Bộ Môn, Kế Toán, Trợ Giảng và Cổng Phụ Huynh tra cứu sổ liên lạc.
+                </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 shrink-0">
-                  <HeartHandshake className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-200">Sổ Liên Lạc Phụ Huynh 24/7</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Tra cứu nhận xét buổi học, chuyên cần, học lực và lịch thi chi tiết tức thời.
+              {/* High-end Slide Content Panel */}
+              <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 border border-slate-800/80 p-5 space-y-4 shadow-xl min-h-[280px] flex flex-col justify-between transition-all duration-500">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${loginSlides[activeSlide].badgeClass}`}>
+                      {loginSlides[activeSlide].icon}
+                      <span>{loginSlides[activeSlide].badge}</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">Slide {activeSlide + 1} / {loginSlides.length}</span>
+                  </div>
+
+                  <h3 className="text-base font-extrabold text-white mt-1">
+                    {loginSlides[activeSlide].title} • <span className="text-indigo-400">{loginSlides[activeSlide].subtitle}</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {loginSlides[activeSlide].description}
                   </p>
+                </div>
+
+                {/* Micro preview mock of the actual screen module */}
+                <div className="pt-2">
+                  {loginSlides[activeSlide].preview}
                 </div>
               </div>
             </div>
 
-            <div className="pt-2 flex items-center gap-4 text-xs text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Bảo mật dữ liệu 256-bit</span>
+            {/* Slider Dots Indicator */}
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-2">
+                {loginSlides.map((_, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => setActiveSlide(index)}
+                    className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                      activeSlide === index ? 'w-8 bg-emerald-500' : 'w-2.5 bg-slate-700 hover:bg-slate-600'
+                    }`}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
               </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Đồng bộ thời gian thực</span>
+
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <div className="flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Bảo mật 256-bit</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Real-time</span>
+                </div>
               </div>
             </div>
           </div>

@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { LMSLesson, LMSAssignment } from '../../types';
-import { generateAIQuiz, askAITutor } from '../../services/geminiService';
 import {
   BookOpenCheck,
-  Sparkles,
   FileText,
   CheckCircle2,
   Award,
-  Send,
-  X,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -19,11 +15,10 @@ export const LMSManager: React.FC = () => {
     assignments,
     students,
     subjects,
-    addAssignment,
     submitAssignmentAnswers,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'lessons' | 'assignments' | 'ai_tutor'>('assignments');
+  const [activeTab, setActiveTab] = useState<'lessons' | 'assignments'>('assignments');
   const [selectedLesson, setSelectedLesson] = useState<LMSLesson | null>(lessons[0] || null);
   const [selectedAssignment, setSelectedAssignment] = useState<LMSAssignment | null>(assignments[0] || null);
 
@@ -31,46 +26,6 @@ export const LMSManager: React.FC = () => {
   const [studentAnswers, setStudentAnswers] = useState<{ [qId: string]: number }>({});
   const [quizFinished, setQuizFinished] = useState(false);
   const [quizScore, setQuizScore] = useState<number | null>(null);
-
-  // AI Quiz Generator Modal state
-  const [isAiQuizModalOpen, setIsAiQuizModalOpen] = useState(false);
-  const [aiSubject, setAiSubject] = useState('Toán học');
-  const [aiGrade, setAiGrade] = useState(8);
-  const [aiTopic, setAiTopic] = useState('Hằng đẳng thức đáng nhớ & Rút gọn phân thức');
-  const [generatingQuiz, setGeneratingQuiz] = useState(false);
-
-  // AI Tutor Ask state
-  const [aiTutorSubject, setAiTutorSubject] = useState('Toán học');
-  const [aiTutorGrade, setAiTutorGrade] = useState(8);
-  const [aiTutorPrompt, setAiTutorPrompt] = useState('');
-  const [aiTutorAnswer, setAiTutorAnswer] = useState<string | null>(null);
-  const [askingAi, setAskingAi] = useState(false);
-
-  const handleGenerateAIQuiz = async () => {
-    setGeneratingQuiz(true);
-    try {
-      const generatedQuestions = await generateAIQuiz(aiSubject, aiGrade, aiTopic, 4);
-
-      const newAssignment: Omit<LMSAssignment, 'id' | 'submissionsCount' | 'createdAt'> = {
-        title: `[AI Đề Xuất] Bài Tập: ${aiTopic}`,
-        subjectId: subjects.find((s) => s.name === aiSubject)?.id || 'sub-toan',
-        subjectName: aiSubject,
-        grade: aiGrade,
-        dueDate: '2026-08-30',
-        maxScore: 10,
-        questions: generatedQuestions,
-      };
-
-      addAssignment(newAssignment);
-      setIsAiQuizModalOpen(false);
-      alert(`Đã tạo thành công bộ câu hỏi AI cho môn ${aiSubject} Khối ${aiGrade}!`);
-    } catch (e) {
-      console.error(e);
-      alert('Không thể tạo quiz lúc này, vui lòng thử lại.');
-    } finally {
-      setGeneratingQuiz(false);
-    }
-  };
 
   const handleSubmitQuiz = () => {
     if (!selectedAssignment) return;
@@ -106,19 +61,6 @@ export const LMSManager: React.FC = () => {
     }
   };
 
-  const handleAskAITutor = async () => {
-    if (!aiTutorPrompt.trim()) return;
-    setAskingAi(true);
-    try {
-      const answer = await askAITutor(aiTutorPrompt, aiTutorSubject, aiTutorGrade);
-      setAiTutorAnswer(answer);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setAskingAi(false);
-    }
-  };
-
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto text-slate-800">
       {/* Header */}
@@ -127,25 +69,15 @@ export const LMSManager: React.FC = () => {
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
             <span>Học Tập</span>
             <span>/</span>
-            <span className="text-slate-700">LMS & Trợ Lý Học Tập</span>
+            <span className="text-slate-700">LMS & Học Liệu</span>
           </div>
           <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2 mt-1">
             <BookOpenCheck className="w-6 h-6 text-indigo-600" />
-            <span>LMS BÀI GIẢNG, BÀI TẬP & TRỢ LÝ AI QUIZ</span>
+            <span>LMS BÀI GIẢNG & BÀI TẬP TỰ ĐỘNG CHẤM ĐIỂM</span>
           </h1>
           <p className="text-xs lg:text-sm text-slate-500 mt-0.5">
-            Học liệu số hóa, giao bài tập tự động chấm điểm và Trợ giảng AI sư phạm
+            Học liệu số hóa, kho bài tập phong phú và tự động chấm điểm chính xác
           </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsAiQuizModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs lg:text-sm font-semibold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>Tạo Đề Thi Bằng AI</span>
-          </button>
         </div>
       </div>
 
@@ -167,16 +99,6 @@ export const LMSManager: React.FC = () => {
           }`}
         >
           Tài Liệu & Bài Giảng ({lessons.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('ai_tutor')}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-            activeTab === 'ai_tutor' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-          <span>Hỏi Trợ Lý AI Tutor</span>
         </button>
       </div>
 
@@ -401,167 +323,6 @@ export const LMSManager: React.FC = () => {
                 Chọn một bài giảng để đọc tài liệu.
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Ask AI Tutor */}
-      {activeTab === 'ai_tutor' && (
-        <div className="p-5 lg:p-6 rounded-xl bg-white border border-slate-200 shadow-xs space-y-5 max-w-3xl mx-auto">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Sparkles className="w-5 h-5 text-amber-500" />
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Trợ Giảng Sư Phạm AI (ANTAM Smart Tutor)</h2>
-              <p className="text-xs text-slate-500">
-                Giải đáp câu hỏi toán, văn, anh, lý, hóa theo phương pháp sư phạm kiên nhẫn
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <label className="block text-slate-600 font-medium mb-1">Chọn Môn Học</label>
-              <select
-                value={aiTutorSubject}
-                onChange={(e) => setAiTutorSubject(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500"
-              >
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-600 font-medium mb-1">Khối Lớp</label>
-              <select
-                value={aiTutorGrade}
-                onChange={(e) => setAiTutorGrade(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500"
-              >
-                {[6, 7, 8, 9].map((g) => (
-                  <option key={g} value={g}>
-                    Khối {g}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-slate-600 font-medium text-xs">Nội Dung Câu Hỏi Cần Trợ Giúp</label>
-            <div className="flex gap-2">
-              <textarea
-                value={aiTutorPrompt}
-                onChange={(e) => setAiTutorPrompt(e.target.value)}
-                rows={3}
-                placeholder="VD: Hãy giải thích cách phân tích đa thức thành nhân tử bằng phương pháp đặt nhân tử chung kèm ví dụ..."
-                className="flex-1 px-3.5 py-2.5 rounded-lg bg-white border border-slate-200 text-xs lg:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={handleAskAITutor}
-                disabled={askingAi || !aiTutorPrompt.trim()}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{askingAi ? 'Đang giải đáp...' : 'Gửi Câu Hỏi Cho AI'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* AI Response Display */}
-          {aiTutorAnswer && (
-            <div className="p-4 rounded-lg bg-indigo-50/50 border border-indigo-100 text-xs lg:text-sm text-slate-800 leading-relaxed whitespace-pre-line space-y-2">
-              <div className="font-bold text-indigo-700 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                <span>Phản hồi sư phạm từ AI Tutor:</span>
-              </div>
-              <div>{aiTutorAnswer}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* AI Quiz Generator Modal */}
-      {isAiQuizModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl text-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-500" />
-                <span>Tạo Bộ Đề Thi Bằng Gemini AI</span>
-              </h2>
-              <button onClick={() => setIsAiQuizModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs lg:text-sm">
-              <div>
-                <label className="block text-slate-600 font-medium mb-1">Môn Học</label>
-                <select
-                  value={aiSubject}
-                  onChange={(e) => setAiSubject(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500"
-                >
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 font-medium mb-1">Khối Lớp</label>
-                <select
-                  value={aiGrade}
-                  onChange={(e) => setAiGrade(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500"
-                >
-                  {[6, 7, 8, 9].map((g) => (
-                    <option key={g} value={g}>
-                      Khối {g}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 font-medium mb-1">Chủ Đề Kiến Thức Cần Tạo Đề</label>
-                <input
-                  type="text"
-                  value={aiTopic}
-                  onChange={(e) => setAiTopic(e.target.value)}
-                  placeholder="VD: Hằng đẳng thức, Thì Hiện Tại Hoàn Thành, Định luật Ôm..."
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAiQuizModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerateAIQuiz}
-                  disabled={generatingQuiz}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{generatingQuiz ? 'AI Đang Tạo Câu Hỏi...' : 'Bắt Đầu Sinh Đề'}</span>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

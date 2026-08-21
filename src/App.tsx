@@ -12,7 +12,6 @@ import { TutorManager } from './components/tutors/TutorManager';
 import { TimetableManager } from './components/timetable/TimetableManager';
 import { AttendanceManager } from './components/attendance/AttendanceManager';
 import { LMSManager } from './components/lms/LMSManager';
-import { AIBusinessAdvisor } from './components/ai/AIBusinessAdvisor';
 import { ParentPortal } from './components/parent/ParentPortal';
 import { TeacherWorkspace } from './components/teacher/TeacherWorkspace';
 import { RolePermissionManager } from './components/admin/RolePermissionManager';
@@ -108,7 +107,6 @@ const MainAppContent: React.FC = () => {
       <Navbar
         onOpenImport={() => setIsImportModalOpen(true)}
         onOpenExport={handleExportExcel}
-        onOpenAIReport={() => setActiveTab('ai_insights')}
         onDownloadTemplate={handleDownloadTemplate}
         onOpenPublicForm={() => setIsPublicFormOpen(true)}
         onOpenLogin={() => setIsLoginPageView(true)}
@@ -134,7 +132,6 @@ const MainAppContent: React.FC = () => {
               onOpenAddStudent={() => setActiveTab('students')}
               onOpenAddExpense={() => setActiveTab('expenses')}
               onOpenAddLead={() => setActiveTab('crm')}
-              onOpenAIAdvisor={() => setActiveTab('ai_insights')}
             />
           )}
 
@@ -185,8 +182,6 @@ const MainAppContent: React.FC = () => {
           )}
 
           {activeTab === 'lms' && <LMSManager />}
-
-          {activeTab === 'ai_insights' && <AIBusinessAdvisor />}
 
           {activeTab === 'parent_portal' && (
             <ParentPortal

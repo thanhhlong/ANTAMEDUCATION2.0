@@ -145,15 +145,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'lms',
-      label: 'LMS & AI Quiz',
+      label: 'LMS & Bài Tập',
       icon: BookOpenCheck,
       roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'TUTOR', 'STUDENT'],
-    },
-    {
-      id: 'ai_insights',
-      label: 'AI Cố Vấn Kinh Doanh',
-      icon: TrendingUp,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'],
     },
     {
       id: 'parent_portal',

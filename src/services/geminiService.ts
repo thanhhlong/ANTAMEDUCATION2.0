@@ -1,15 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
 import { Student, InvoiceRecord, ExpenseItem, ParentLead, TutorAssistant, CustomTutoringNeed, LMSQuestion } from '../types';
-
-function getApiKey(): string | undefined {
-  // Check common environment variable injection points
-  return (
-    (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
-    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) ||
-    (typeof window !== 'undefined' && (window as any).__GEMINI_API_KEY__) ||
-    undefined
-  );
-}
 
 export interface BusinessAIInsight {
   healthScore: number;
@@ -45,56 +34,24 @@ export async function getAIBusinessInsights(
   const overdueCount = invoices.filter((i) => i.status === 'overdue').length;
   const newLeadsCount = leads.filter((l) => l.status === 'new' || l.status === 'consulting').length;
 
-  const apiKey = getApiKey();
+  try {
+    const response = await fetch('/api/gemini/insights', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ students, invoices, expenses, leads, tutors }),
+    });
 
-  if (apiKey) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Bạn là Giám đốc Tài chính & Vận hành Chiến lược (CFO & COO) của Hệ thống Giáo dục AN TÂM EDUCATION.
-Hãy phân tích dữ liệu hoạt động thực tế sau và đưa ra Báo cáo Phân tích Kinh doanh & Đề xuất hành động theo định dạng JSON hợp lệ:
-
-DỮ LIỆU HIỆN TẠI:
-- Tổng số học sinh: ${students.length} (Khối 6, 7, 8, 9)
-- Tổng doanh thu học phí dự kiến: ${totalDue.toLocaleString()} đ
-- Đã thu: ${totalCollected.toLocaleString()} đ (${((totalCollected / (totalDue || 1)) * 100).toFixed(1)}%)
-- Công nợ còn lại: ${totalDebt.toLocaleString()} đ
-- Số học sinh quá hạn học phí: ${overdueCount}
-- Chi phí vận hành: ${totalExpenses.toLocaleString()} đ
-- Dòng tiền ròng hiện tại: ${netCashflow.toLocaleString()} đ
-- Tổng số Lead CRM: ${leads.length} (Trong đó ${newLeadsCount} lead mới/đang tư vấn)
-- Đội ngũ Trợ giảng/Gia sư: ${tutors.length} người
-
-Hãy trả về JSON theo schema:
-{
-  "healthScore": number (1-100),
-  "executiveSummary": string,
-  "keyInsights": [
-    { "title": string, "description": string, "impact": "positive"|"warning"|"critical"|"info" }
-  ],
-  "revenueOptimization": [string],
-  "debtRecoveryPlan": [string],
-  "enrollmentStrategy": [string],
-  "nextMonthForecast": {
-    "estimatedRevenue": number,
-    "estimatedExpenses": number,
-    "expectedNetProfit": number,
-    "confidencePercent": number
-  }
-}
-Chỉ trả về chuỗi JSON thuần, không bọc markdown.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-
-      const text = response.text?.trim() || '';
-      const cleanJson = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      const parsed = JSON.parse(cleanJson);
-      return parsed;
-    } catch (err) {
-      console.warn('Gemini API call failed, using intelligent heuristics fallback:', err);
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    } else {
+      const errText = await response.text();
+      console.warn('Server Gemini call failed, using fallback:', errText);
     }
+  } catch (err) {
+    console.warn('Gemini API call failed, using intelligent heuristics fallback:', err);
   }
 
   // Fallback high-fidelity business insight calculation
@@ -228,40 +185,24 @@ export async function generateAIQuiz(
   topic: string,
   questionCount = 4
 ): Promise<LMSQuestion[]> {
-  const apiKey = getApiKey();
+  try {
+    const response = await fetch('/api/gemini/quiz', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ subjectName, grade, topic, questionCount }),
+    });
 
-  if (apiKey) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Tạo bộ ${questionCount} câu hỏi trắc nghiệm khách quan chuẩn chương trình Bộ Giáo Dục Việt Nam cho:
-- Môn học: ${subjectName}
-- Khối lớp: Lớp ${grade}
-- Chủ đề: ${topic}
-
-Yêu cầu trả về định dạng JSON thuần túy (không markdown):
-[
-  {
-    "id": "q1",
-    "type": "multiple_choice",
-    "content": "Nội dung câu hỏi...",
-    "options": ["Phương án A", "Phương án B", "Phương án C", "Phương án D"],
-    "correctOptionIndex": 0,
-    "points": 2.5,
-    "explanation": "Lời giải chi tiết từng bước..."
-  }
-]`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-
-      const text = response.text?.trim() || '';
-      const cleanJson = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      return JSON.parse(cleanJson);
-    } catch (err) {
-      console.warn('Gemini Quiz generation failed, fallback to pre-generated questions:', err);
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    } else {
+      const errText = await response.text();
+      console.warn('Server Gemini Quiz generation failed, fallback to pre-generated questions:', errText);
     }
+  } catch (err) {
+    console.warn('Gemini Quiz generation failed, fallback to pre-generated questions:', err);
   }
 
   // Pre-configured fallback questions
@@ -310,30 +251,24 @@ export async function askAITutor(
   subject: string,
   grade: number
 ): Promise<string> {
-  const apiKey = getApiKey();
+  try {
+    const response = await fetch('/api/gemini/tutor', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userQuery, subject, grade }),
+    });
 
-  if (apiKey) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Bạn là Trợ lý Gia sư AI thông minh và tận tâm của Hệ thống AN TÂM EDUCATION.
-Môn: ${subject}, Khối: Lớp ${grade}.
-Học sinh hoặc Giáo viên hỏi: "${userQuery}".
-
-Hãy giải đáp bằng tiếng Việt với phong cách sư phạm chuẩn mực:
-1. Trực quan, dễ hiểu, từng bước rõ ràng.
-2. Nêu công thức hoặc định lý áp dụng.
-3. Kèm ví dụ minh họa và mẹo ghi nhớ nếu có.
-4. Động viên học sinh tự tin học tập.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-
-      return response.text || 'Không có phản hồi từ AI.';
-    } catch (err) {
-      console.warn('Gemini Tutor failed, fallback response:', err);
+    if (response.ok) {
+      const data = await response.json();
+      return data.text || 'Không có phản hồi từ AI.';
+    } else {
+      const errText = await response.text();
+      console.warn('Server Gemini Tutor failed, fallback response:', errText);
     }
+  } catch (err) {
+    console.warn('Gemini Tutor failed, fallback response:', err);
   }
 
   return `Chào bạn! Về câu hỏi "${userQuery}" môn ${subject} Lớp ${grade}:

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatShortCurrency } from '../../utils/formatters';
-import { getAIBusinessInsights, BusinessAIInsight } from '../../services/geminiService';
 import {
   Users,
   GraduationCap,
@@ -11,9 +10,7 @@ import {
   AlertTriangle,
   Receipt,
   TrendingUp,
-  Sparkles,
   ArrowUpRight,
-  Clock,
   Calendar,
   ChevronRight,
   Send,
@@ -27,7 +24,6 @@ interface AdminOverviewProps {
   onOpenAddStudent: () => void;
   onOpenAddExpense: () => void;
   onOpenAddLead: () => void;
-  onOpenAIAdvisor: () => void;
 }
 
 export const AdminOverview: React.FC<AdminOverviewProps> = ({
@@ -36,12 +32,8 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
   onOpenAddStudent,
   onOpenAddExpense,
   onOpenAddLead,
-  onOpenAIAdvisor,
 }) => {
   const { students, subjects, invoices, expenses, leads, tutors, scheduleSessions, selectedGrade } = useApp();
-
-  const [aiInsight, setAiInsight] = useState<BusinessAIInsight | null>(null);
-  const [loadingAi, setLoadingAi] = useState(false);
 
   // Filter based on selectedGrade if not 'all'
   const filteredStudents = selectedGrade === 'all' ? students : students.filter((s) => s.grade === selectedGrade);
@@ -56,26 +48,6 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
   const totalDebt = filteredInvoices.reduce((acc, i) => acc + i.remainingAmount, 0);
   const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
   const netCashflow = totalPaid - (selectedGrade === 'all' ? totalExpenses : 0);
-
-  // Load AI Insights
-  useEffect(() => {
-    let isMounted = true;
-    const fetchInsights = async () => {
-      setLoadingAi(true);
-      try {
-        const res = await getAIBusinessInsights(students, invoices, expenses, leads, tutors);
-        if (isMounted) setAiInsight(res);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (isMounted) setLoadingAi(false);
-      }
-    };
-    fetchInsights();
-    return () => {
-      isMounted = false;
-    };
-  }, [students.length, invoices.length, expenses.length, leads.length]);
 
   // Grade Breakdown
   const grades = [6, 7, 8, 9];
@@ -303,38 +275,38 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
         </div>
       </div>
 
-      {/* AI Business Insight Banner - Geometric Balance Rich Indigo Accent */}
+      {/* Operation Insight Banner - Geometric Balance Rich Indigo Accent */}
       <div className="bg-indigo-900 rounded-xl p-6 text-white relative overflow-hidden shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div className="space-y-3 max-w-4xl">
             <div className="flex items-center gap-2">
               <span className="bg-indigo-500 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider text-white">
-                AI BUSINESS INSIGHT
+                BÁO CÁO VẬN HÀNH TRUNG TÂM
               </span>
               <span className="text-xs text-indigo-200 font-medium">
-                Chỉ số sức khỏe tài chính: <strong className="text-emerald-300 font-bold">{aiInsight?.healthScore || 85}/100</strong>
+                Tỷ lệ hoàn thành học bổng/học phí: <strong className="text-emerald-300 font-bold">{totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 100}%</strong>
               </span>
             </div>
             <p className="text-sm lg:text-base font-normal leading-relaxed text-indigo-100">
-              {loadingAi ? 'Đang phân tích số liệu tài chính & CRM...' : aiInsight?.executiveSummary}
+              Hệ thống AN TÂM EDUCATION đang duy trì tỷ lệ hoàn thành học phí đạt {totalDue > 0 ? ((totalPaid / totalDue) * 100).toFixed(1) : '100'}%. Đang quản lý và giảng dạy {totalStudents} học sinh chính thức thuộc khối 6, 7, 8, 9 cùng đội ngũ trợ giảng & gia sư hỗ trợ liên tục.
             </p>
             <div className="flex flex-wrap gap-3 pt-1">
               <div className="bg-white/10 px-3.5 py-2 rounded-lg border border-white/10">
-                <p className="text-[10px] text-indigo-300 font-bold uppercase">ĐỀ XUẤT</p>
-                <p className="text-xs font-semibold text-white">Nhắc nợ tự động Zalo cho các học sinh quá hạn</p>
+                <p className="text-[10px] text-indigo-300 font-bold uppercase">TRỌNG TÂM</p>
+                <p className="text-xs font-semibold text-white">Thu hồi {invoices.filter((i) => i.remainingAmount > 0).length} khoản học phí quá hạn tháng này</p>
               </div>
               <div className="bg-white/10 px-3.5 py-2 rounded-lg border border-white/10">
                 <p className="text-[10px] text-indigo-300 font-bold uppercase">CƠ HỘI</p>
-                <p className="text-xs font-semibold text-white">Mở thêm lớp Tiếng Anh & Gia sư 1-on-1 Khối 8</p>
+                <p className="text-xs font-semibold text-white">Tư vấn tuyển sinh cho {totalLeads} lead phụ huynh mới đăng ký</p>
               </div>
             </div>
           </div>
 
           <button
-            onClick={onOpenAIAdvisor}
+            onClick={() => onNavigate('finance')}
             className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-white text-indigo-900 hover:bg-indigo-50 text-xs font-bold shrink-0 transition-colors cursor-pointer whitespace-nowrap shadow-xs"
           >
-            <span>Báo Cáo Toàn Diện</span>
+            <span>Quản Lý Học Phí</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
