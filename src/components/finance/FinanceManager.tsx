@@ -34,11 +34,64 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
     selectedGrade,
     setSelectedGrade,
     addSubject,
+    updateSubject,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid' | 'overdue'>('all');
   const [activeTab, setActiveTab] = useState<'invoices' | 'debtors' | 'pricing'>('invoices');
+
+  // Secondary sub-tab for pricing: standard default or grade-specific overrides
+  const [pricingSubTab, setPricingSubTab] = useState<'standard' | 'grade_adjusted'>('grade_adjusted');
+  const [editingGrade, setEditingGrade] = useState<number>(8); // Default to Grade 8
+  const [feeInputs, setFeeInputs] = useState<{ [key: string]: string }>({});
+
+  // Initialize input values for the selected grade
+  React.useEffect(() => {
+    const initialInputs: { [key: string]: string } = {};
+    subjects.forEach((sub) => {
+      const currentVal = sub.gradeFees && sub.gradeFees[editingGrade] !== undefined
+        ? String(sub.gradeFees[editingGrade])
+        : '';
+      initialInputs[sub.id] = currentVal;
+    });
+    setFeeInputs(initialInputs);
+  }, [editingGrade, subjects]);
+
+  const handleSaveGradeFee = (subjectId: string) => {
+    const inputValue = feeInputs[subjectId];
+    const sub = subjects.find((s) => s.id === subjectId);
+    if (!sub) return;
+
+    const updatedGradeFees = { ...(sub.gradeFees || {}) };
+    if (!inputValue || inputValue.trim() === '') {
+      delete updatedGradeFees[editingGrade];
+    } else {
+      const num = parseInt(inputValue, 10);
+      if (isNaN(num) || num < 0) {
+        alert('Vui lòng nhập số tiền hợp lệ!');
+        return;
+      }
+      updatedGradeFees[editingGrade] = num;
+    }
+
+    updateSubject(subjectId, { gradeFees: updatedGradeFees });
+    alert(`Đã cập nhật học phí môn ${sub.name} cho Khối ${editingGrade} thành công!`);
+  };
+
+  const handleResetGradeFee = (subjectId: string) => {
+    const sub = subjects.find((s) => s.id === subjectId);
+    if (!sub) return;
+
+    const updatedGradeFees = { ...(sub.gradeFees || {}) };
+    delete updatedGradeFees[editingGrade];
+
+    updateSubject(subjectId, { gradeFees: updatedGradeFees });
+    
+    // Clear local input
+    setFeeInputs(prev => ({ ...prev, [subjectId]: '' }));
+    alert(`Đã khôi phục học phí môn ${sub.name} về mức mặc định cho Khối ${editingGrade}.`);
+  };
 
   // Export modal state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -51,9 +104,26 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
 
   // Subject Pricing Modal
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newSubjectFee, setNewSubjectFee] = useState(400000);
   const [newSubjectColor, setNewSubjectColor] = useState('#3B82F6');
+
+  const handleOpenAddSubject = () => {
+    setEditingSubjectId(null);
+    setNewSubjectName('');
+    setNewSubjectFee(400000);
+    setNewSubjectColor('#3B82F6');
+    setIsSubjectModalOpen(true);
+  };
+
+  const handleOpenEditSubject = (sub: any) => {
+    setEditingSubjectId(sub.id);
+    setNewSubjectName(sub.name);
+    setNewSubjectFee(sub.defaultFee);
+    setNewSubjectColor(sub.color);
+    setIsSubjectModalOpen(true);
+  };
 
   // Filter invoices
   const filtered = invoices.filter((inv) => {
@@ -129,16 +199,29 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
   const handleAddCustomSubject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubjectName.trim()) return;
-    addSubject({
-      code: newSubjectName.slice(0, 4).toUpperCase(),
-      name: newSubjectName.trim(),
-      description: 'Môn học bổ sung',
-      defaultFee: newSubjectFee,
-      color: newSubjectColor,
-      gradeLevels: [6, 7, 8, 9, 10, 11, 12],
-      active: true,
-    });
+    
+    if (editingSubjectId) {
+      updateSubject(editingSubjectId, {
+        name: newSubjectName.trim(),
+        defaultFee: newSubjectFee,
+        color: newSubjectColor,
+      });
+      alert(`Đã cập nhật thông tin môn học ${newSubjectName.trim()} thành công!`);
+    } else {
+      addSubject({
+        code: newSubjectName.slice(0, 4).toUpperCase(),
+        name: newSubjectName.trim(),
+        description: 'Môn học bổ sung',
+        defaultFee: newSubjectFee,
+        color: newSubjectColor,
+        gradeLevels: [6, 7, 8, 9, 10, 11, 12],
+        active: true,
+      });
+      alert(`Đã thêm môn học ${newSubjectName.trim()} thành công!`);
+    }
+    
     setNewSubjectName('');
+    setEditingSubjectId(null);
     setIsSubjectModalOpen(false);
   };
 
@@ -402,53 +485,211 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
       {/* Main Tab Content */}
       {activeTab === 'pricing' ? (
         /* Pricing & Subjects Table */
-        <div className="rounded-xl bg-white border border-slate-200 p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="rounded-xl bg-white border border-slate-200 p-5 space-y-5 shadow-xs">
+          {/* Subheader and Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Bảng Mức Học Phí Chuẩn Theo Môn</h2>
+              <h2 className="text-base font-bold text-slate-900">Quản Lý & Cấu Hình Học Phí</h2>
               <p className="text-xs text-slate-500">
-                Định mức thu học phí tự động áp dụng khi học sinh đăng ký môn
+                Điều chỉnh học phí chuẩn của môn học hoặc cấu hình mức giá riêng biệt theo từng khối lớp (K6 - K12)
               </p>
             </div>
-            <button
-              onClick={() => setIsSubjectModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Thêm Môn Học</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {subjects.map((sub) => (
-              <div
-                key={sub.id}
-                className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: sub.color }}
-                    />
-                    <span className="font-bold text-slate-900 text-sm">{sub.name}</span>
-                  </div>
-                  <span className="font-mono text-xs font-bold text-slate-500">
-                    {sub.code}
-                  </span>
-                </div>
-
-                <div className="text-xs text-slate-500 line-clamp-2">{sub.description}</div>
-
-                <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                  <span className="text-xs text-slate-500">Định mức / tháng:</span>
-                  <span className="text-sm font-bold text-indigo-700">
-                    {formatCurrency(sub.defaultFee)}
-                  </span>
-                </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                <button
+                  onClick={() => setPricingSubTab('standard')}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all ${
+                    pricingSubTab === 'standard'
+                      ? 'bg-white text-slate-800 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Mức Phí Chuẩn
+                </button>
+                <button
+                  onClick={() => setPricingSubTab('grade_adjusted')}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer transition-all ${
+                    pricingSubTab === 'grade_adjusted'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Điều Chỉnh Theo Khối
+                </button>
               </div>
-            ))}
+
+              <button
+                onClick={handleOpenAddSubject}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Thêm Môn Học</span>
+              </button>
+            </div>
           </div>
+
+          {pricingSubTab === 'standard' ? (
+            /* Sub-tab 1: Standard Tuition Table with Edit Action */
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <table className="w-full text-left text-xs lg:text-sm text-slate-700">
+                <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3">Môn Học</th>
+                    <th className="px-4 py-3">Mã Môn</th>
+                    <th className="px-4 py-3">Mô Tả</th>
+                    <th className="px-4 py-3">Học Phí Chuẩn / Tháng</th>
+                    <th className="px-4 py-3 text-right">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {subjects.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3.5 font-bold text-slate-900 flex items-center gap-2.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: sub.color }}
+                        />
+                        <span>{sub.name}</span>
+                      </td>
+                      <td className="px-4 py-3.5 font-mono text-slate-500 font-bold">{sub.code}</td>
+                      <td className="px-4 py-3.5 text-xs text-slate-500 max-w-xs truncate">{sub.description || 'Môn học bồi dưỡng'}</td>
+                      <td className="px-4 py-3.5 text-indigo-700 font-bold font-mono">
+                        {formatCurrency(sub.defaultFee)}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <button
+                          onClick={() => handleOpenEditSubject(sub)}
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-semibold border border-indigo-200/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                          <span>Chỉnh Sửa</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            /* Sub-tab 2: Grade-Specific Adjustable Matrix/Table */
+            <div className="space-y-4">
+              {/* Inner Grade Selector */}
+              <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                <span className="text-xs text-slate-500 font-bold px-2 uppercase tracking-wider">CHỌN KHỐI LỚP ĐỂ ĐIỀU CHỈNH:</span>
+                {[6, 7, 8, 9, 10, 11, 12].map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setEditingGrade(g)}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                      editingGrade === g
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+                    }`}
+                  >
+                    Khối {g}
+                  </button>
+                ))}
+              </div>
+
+              {/* Subject Adjustment List */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs lg:text-sm text-slate-700">
+                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3">Môn Học</th>
+                      <th className="px-4 py-3">Mã Môn</th>
+                      <th className="px-4 py-3">Mức Học Phí Mặc Định</th>
+                      <th className="px-4 py-3">Mức Học Phí Khối {editingGrade}</th>
+                      <th className="px-4 py-3 text-center">Trạng Thái Áp Dụng</th>
+                      <th className="px-4 py-3 text-right">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {subjects.map((sub) => {
+                      const hasOverride = sub.gradeFees && sub.gradeFees[editingGrade] !== undefined;
+                      const activeFee = hasOverride ? sub.gradeFees![editingGrade] : sub.defaultFee;
+                      const inputValue = feeInputs[sub.id] || '';
+
+                      return (
+                        <tr key={sub.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-slate-900 flex items-center gap-2.5">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: sub.color }}
+                            />
+                            <span>{sub.name}</span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-slate-500 font-bold">{sub.code}</td>
+                          <td className="px-4 py-3 text-slate-600">{formatCurrency(sub.defaultFee)} / tháng</td>
+                          
+                          {/* Input Field for override */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2 max-w-[160px]">
+                              <input
+                                type="number"
+                                value={inputValue}
+                                onChange={(e) => setFeeInputs(prev => ({ ...prev, [sub.id]: e.target.value }))}
+                                placeholder={String(sub.defaultFee)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 bg-white"
+                              />
+                              <span className="text-slate-400 font-semibold text-xs">₫</span>
+                            </div>
+                          </td>
+
+                          {/* Status Badge */}
+                          <td className="px-4 py-3 text-center">
+                            {hasOverride ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Đã điều chỉnh ({formatShortCurrency(activeFee)})
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                Mặc định chuẩn
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Action Buttons */}
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleSaveGradeFee(sub.id)}
+                                className="px-2.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                              >
+                                Lưu áp dụng
+                              </button>
+                              {hasOverride && (
+                                <button
+                                  onClick={() => handleResetGradeFee(sub.id)}
+                                  className="px-2.5 py-1.5 rounded-md bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-medium transition-all cursor-pointer"
+                                  title="Khôi phục về mức học phí chuẩn mặc định"
+                                >
+                                  Đặt lại
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Dynamic Information Banner */}
+              <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-900 text-xs space-y-1">
+                <h4 className="font-bold flex items-center gap-1">
+                  💡 Hướng dẫn cấu hình học phí theo Khối lớp:
+                </h4>
+                <ul className="list-disc list-inside space-y-1 pl-1 text-slate-600 leading-relaxed font-normal">
+                  <li><strong>Học phí mặc định:</strong> Khi học sinh mới đăng ký, hệ thống sẽ sử dụng mức học phí chuẩn của môn học.</li>
+                  <li><strong>Điều chỉnh theo Khối:</strong> Khi bạn nhập số tiền học phí cụ thể cho một Khối (ví dụ: 1,200,000đ cho Toán Khối 9) và ấn <strong>"Lưu áp dụng"</strong>, bất kỳ học sinh nào thuộc Khối đó khi đăng ký môn Toán sẽ tự động áp dụng mức học phí 1,200,000đ thay vì mức 1,000,000đ chuẩn.</li>
+                  <li>Để quay lại mức mặc định, chỉ cần xóa trắng ô nhập liệu và nhấn <strong>"Lưu áp dụng"</strong> hoặc nhấn nút <strong>"Đặt lại"</strong>.</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Invoices & Debtors Table */
@@ -591,14 +832,18 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
         </div>
       )}
 
-      {/* Subject Creation Modal */}
+      {/* Subject Creation / Edit Modal */}
       {isSubjectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl text-slate-800">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-indigo-600" />
-                <span>Thêm Môn Học Mới</span>
+                {editingSubjectId ? (
+                  <Settings className="w-4 h-4 text-indigo-600" />
+                ) : (
+                  <Plus className="w-4 h-4 text-indigo-600" />
+                )}
+                <span>{editingSubjectId ? 'Chỉnh Sửa Thông Tin Môn Học' : 'Thêm Môn Học Mới'}</span>
               </h2>
               <button
                 onClick={() => setIsSubjectModalOpen(false)}
@@ -609,6 +854,40 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
             </div>
 
             <form onSubmit={handleAddCustomSubject} className="space-y-3 text-xs lg:text-sm">
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
+                <label className="block text-slate-700 font-bold text-[11px] uppercase tracking-wider">
+                  Chọn môn học để chỉnh sửa (hoặc thêm mới):
+                </label>
+                <select
+                  value={editingSubjectId || ''}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (!id) {
+                      setEditingSubjectId(null);
+                      setNewSubjectName('');
+                      setNewSubjectFee(400000);
+                      setNewSubjectColor('#3B82F6');
+                    } else {
+                      const selectedSub = subjects.find((s) => s.id === id);
+                      if (selectedSub) {
+                        setEditingSubjectId(selectedSub.id);
+                        setNewSubjectName(selectedSub.name);
+                        setNewSubjectFee(selectedSub.defaultFee);
+                        setNewSubjectColor(selectedSub.color);
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-1.5 rounded-md bg-white border border-slate-200 text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-semibold cursor-pointer"
+                >
+                  <option value="">-- Tạo Môn Học Mới --</option>
+                  {subjects.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name} ({sub.code}) - Mức chuẩn: {formatCurrency(sub.defaultFee)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-slate-600 font-medium mb-1">Tên Môn Học *</label>
                 <input
@@ -660,9 +939,9 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
                 >
-                  Thêm Môn Học
+                  {editingSubjectId ? 'Lưu Thay Đổi' : 'Thêm Môn Học'}
                 </button>
               </div>
             </form>

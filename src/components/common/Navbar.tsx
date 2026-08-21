@@ -14,6 +14,7 @@ import {
   BookOpen,
   LogIn,
   User as UserIcon,
+  Menu,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -23,6 +24,7 @@ interface NavbarProps {
   onOpenPublicForm: () => void;
   onOpenLogin: () => void;
   onOpenProfile: () => void;
+  onToggleSidebar: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenPublicForm,
   onOpenLogin,
   onOpenProfile,
+  onToggleSidebar,
 }) => {
   const { currentRole, quickLoginAsRole, selectedGrade, setSelectedGrade, currentUser, isAuthenticated } = useApp();
 
@@ -47,7 +50,15 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200 text-slate-800 shadow-2xs">
       <div className="px-3 lg:px-6 py-2 flex items-center justify-between gap-3">
         {/* Zone 1: Brand Title */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onToggleSidebar}
+            className="md:hidden p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer mr-0.5"
+            aria-label="Toggle menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          
           <div className="w-8 h-8 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-xs border border-slate-200">
             <AnTamLogo size="sm" variant="icon" showText={false} className="w-full h-full" />
           </div>

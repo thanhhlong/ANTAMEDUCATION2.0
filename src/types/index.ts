@@ -22,6 +22,7 @@ export interface Subject {
   gradeLevels: number[]; // [6, 7, 8, 9, 10, 11, 12]
   iconName?: string;
   active: boolean;
+  gradeFees?: { [grade: number]: number }; // Specific overrides per grade
 }
 
 export interface TuitionPlan {
@@ -75,6 +76,7 @@ export interface Student {
   totalTuitionDue: number; // Auto calculated sum
   totalPaid: number;
   remainingDebt: number;
+  tuitionWaived?: boolean; // Flag to indicate 100% tuition waiving
 }
 
 export interface PaymentTransaction {

@@ -70,6 +70,8 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
     parentRelationship: 'Bố' as const,
     notes: '',
     enrolledSubjectIds: ['sub-toan'],
+    customSubjectFees: {} as { [subjectId: string]: number },
+    tuitionWaived: false,
   });
 
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
@@ -125,6 +127,8 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
       parentRelationship: 'Bố',
       notes: '',
       enrolledSubjectIds: ['sub-toan'],
+      customSubjectFees: {},
+      tuitionWaived: false,
     });
     setDuplicateWarning(null);
     setEditingStudent(null);
@@ -133,6 +137,11 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
 
   const handleOpenEdit = (student: Student) => {
     setEditingStudent(student);
+    const initialCustomFees: { [subjectId: string]: number } = {};
+    student.enrollments.forEach((e) => {
+      initialCustomFees[e.subjectId] = e.finalFee;
+    });
+
     setFormData({
       code: student.code,
       fullName: student.fullName,
@@ -151,6 +160,8 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
       parentRelationship: student.parentRelationship as any,
       notes: student.notes || '',
       enrolledSubjectIds: student.enrollments.map((e) => e.subjectId),
+      customSubjectFees: initialCustomFees,
+      tuitionWaived: !!student.tuitionWaived,
     });
     setDuplicateWarning(null);
     setIsAddModalOpen(true);
@@ -184,13 +195,22 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
     // Build enrollments
     const newEnrollments = formData.enrolledSubjectIds.map((subId) => {
       const targetSub = subjects.find((s) => s.id === subId) || subjects[0];
+      const hasCustomFee = formData.customSubjectFees[subId] !== undefined;
+      const customFeeValue = formData.customSubjectFees[subId];
+
+      const gradeSpecificFee = targetSub.gradeFees && targetSub.gradeFees[formData.grade] !== undefined
+        ? targetSub.gradeFees[formData.grade]
+        : targetSub.defaultFee;
+
+      const finalFeeToUse = hasCustomFee ? customFeeValue : gradeSpecificFee;
+
       return {
         id: `en-${Date.now()}-${subId}`,
         subjectId: targetSub.id,
         subjectName: targetSub.name,
-        monthlyFee: targetSub.defaultFee,
+        monthlyFee: finalFeeToUse,
         discount: 0,
-        finalFee: targetSub.defaultFee,
+        finalFee: finalFeeToUse,
         startDate: new Date().toISOString().split('T')[0],
         status: 'active' as const,
       };
@@ -213,9 +233,16 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
   };
 
   // Auto calculate total tuition in form
-  const totalFormFee = formData.enrolledSubjectIds.reduce((sum, subId) => {
+  const totalFormFee = formData.tuitionWaived ? 0 : formData.enrolledSubjectIds.reduce((sum, subId) => {
     const sub = subjects.find((s) => s.id === subId);
-    return sum + (sub ? sub.defaultFee : 0);
+    if (!sub) return sum;
+    if (formData.customSubjectFees[subId] !== undefined) {
+      return sum + formData.customSubjectFees[subId];
+    }
+    const gradeSpecificFee = sub.gradeFees && sub.gradeFees[formData.grade] !== undefined
+      ? sub.gradeFees[formData.grade]
+      : sub.defaultFee;
+    return sum + gradeSpecificFee;
   }, 0);
 
   return (
@@ -455,13 +482,21 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                       </td>
 
                       {/* Tuition Fee */}
-                      <td className="px-3 py-3.5 font-bold text-slate-900 whitespace-nowrap">
-                        {formatCurrency(student.totalTuitionDue)}
+                      <td className="px-3 py-3.5 whitespace-nowrap">
+                        {student.tuitionWaived ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
+                            Miễn học phí 100%
+                          </span>
+                        ) : (
+                          <span className="font-bold text-slate-900">{formatCurrency(student.totalTuitionDue)}</span>
+                        )}
                       </td>
 
                       {/* Debt */}
                       <td className="px-3 py-3.5 whitespace-nowrap">
-                        {student.remainingDebt > 0 ? (
+                        {student.tuitionWaived ? (
+                          <span className="text-slate-400 text-xs font-medium">—</span>
+                        ) : student.remainingDebt > 0 ? (
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-rose-600">
                               {formatCurrency(student.remainingDebt)}
@@ -708,13 +743,29 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
 
               {/* Row 5: ĐĂNG KÝ MÔN HỌC & TỰ ĐỘNG TÍNH HỌC PHÍ */}
               <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100/50 pb-2.5">
                   <div className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
                     <CreditCard className="w-4 h-4 text-indigo-600" />
                     <span>Đăng Ký Môn Học & Học Phí Hàng Tháng</span>
                   </div>
-                  <div className="text-xs font-bold text-indigo-700">
-                    Tổng: {formatCurrency(totalFormFee)} / tháng
+                  
+                  {/* Tuition Waive Toggle */}
+                  <label className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formData.tuitionWaived}
+                      onChange={(e) => setFormData({ ...formData, tuitionWaived: e.target.checked })}
+                      className="rounded text-rose-600 focus:ring-0 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-bold">Miễn 100% học phí</span>
+                  </label>
+                  
+                  <div className="text-xs font-bold text-indigo-700 font-mono">
+                    {formData.tuitionWaived ? (
+                      <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">MIỄN HỌC PHÍ (0 ₫)</span>
+                    ) : (
+                      <span>Tổng: {formatCurrency(totalFormFee)} / tháng</span>
+                    )}
                   </div>
                 </div>
 
@@ -752,12 +803,79 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                           <span>{sub.name}</span>
                         </div>
                         <span className={`text-[11px] font-mono ${isChecked ? 'text-indigo-100' : 'text-slate-500'}`}>
-                          {formatShortCurrency(sub.defaultFee)}
+                          {formatShortCurrency(sub.gradeFees && sub.gradeFees[formData.grade] !== undefined ? sub.gradeFees[formData.grade] : sub.defaultFee)}
                         </span>
                       </label>
                     );
                   })}
                 </div>
+
+                {formData.enrolledSubjectIds.length > 0 && !formData.tuitionWaived && (
+                  <div className="mt-3 bg-white p-3.5 rounded-lg border border-indigo-100 space-y-2">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Tùy chỉnh số tiền học phí cho từng môn học đã chọn:
+                    </span>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {formData.enrolledSubjectIds.map((subId) => {
+                        const sub = subjects.find((s) => s.id === subId);
+                        if (!sub) return null;
+                        
+                        const defaultOrGradeFee = sub.gradeFees && sub.gradeFees[formData.grade] !== undefined
+                          ? sub.gradeFees[formData.grade]
+                          : sub.defaultFee;
+                          
+                        const currentFee = formData.customSubjectFees[subId] !== undefined
+                          ? formData.customSubjectFees[subId]
+                          : defaultOrGradeFee;
+                          
+                        return (
+                          <div key={subId} className="flex items-center justify-between gap-3 text-xs bg-slate-50 p-2 rounded-md border border-slate-200">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sub.color }} />
+                              <span className="font-semibold text-slate-700">{sub.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <input
+                                type="number"
+                                value={currentFee}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  setFormData({
+                                    ...formData,
+                                    customSubjectFees: {
+                                      ...formData.customSubjectFees,
+                                      [subId]: isNaN(val) ? 0 : val,
+                                    }
+                                  });
+                                }}
+                                className="w-24 px-2 py-1 rounded border border-slate-200 bg-white font-mono font-bold text-right text-xs text-indigo-700 focus:outline-none focus:border-indigo-500"
+                              />
+                              <span className="text-slate-500 font-bold">₫</span>
+                              
+                              {formData.customSubjectFees[subId] !== undefined && formData.customSubjectFees[subId] !== defaultOrGradeFee && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextCustomFees = { ...formData.customSubjectFees };
+                                    delete nextCustomFees[subId];
+                                    setFormData({
+                                      ...formData,
+                                      customSubjectFees: nextCustomFees,
+                                    });
+                                  }}
+                                  className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium ml-1 cursor-pointer"
+                                  title="Khôi phục học phí chuẩn"
+                                >
+                                  Đặt lại
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Notes */}
@@ -843,7 +961,11 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                   Môn Đăng Ký & Học Phí
                 </span>
                 <span className="text-sm font-bold text-emerald-600">
-                  {formatCurrency(viewingStudent.totalTuitionDue)}/tháng
+                  {viewingStudent.tuitionWaived ? (
+                    <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-xs">MIỄN HỌC PHÍ 100%</span>
+                  ) : (
+                    <span>{formatCurrency(viewingStudent.totalTuitionDue)}/tháng</span>
+                  )}
                 </span>
               </div>
 
@@ -854,14 +976,16 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                     className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between text-xs"
                   >
                     <span className="font-semibold text-slate-800">{en.subjectName}</span>
-                    <span className="font-mono text-slate-600">{formatCurrency(en.finalFee)}</span>
+                    <span className="font-mono text-slate-600">
+                      {viewingStudent.tuitionWaived ? 'Được miễn (0 ₫)' : formatCurrency(en.finalFee)}
+                    </span>
                   </div>
                 ))}
               </div>
 
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
                 <span>Đã nộp: <strong className="text-emerald-600">{formatCurrency(viewingStudent.totalPaid)}</strong></span>
-                <span>Công nợ còn lại: <strong className="text-rose-600">{formatCurrency(viewingStudent.remainingDebt)}</strong></span>
+                <span>Công nợ còn lại: <strong className="text-rose-600">{viewingStudent.tuitionWaived ? '0 ₫' : formatCurrency(viewingStudent.remainingDebt)}</strong></span>
               </div>
             </div>
 

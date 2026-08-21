@@ -471,15 +471,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Recalculate student total tuition
-  const calculateStudentFees = (enrollments: Student['enrollments'], totalPaid: number) => {
-    const totalDue = enrollments.reduce((acc, curr) => acc + (curr.finalFee || 0), 0);
+  const calculateStudentFees = (enrollments: Student['enrollments'], totalPaid: number, tuitionWaived?: boolean) => {
+    const totalDue = tuitionWaived ? 0 : enrollments.reduce((acc, curr) => acc + (curr.finalFee || 0), 0);
     const remaining = Math.max(0, totalDue - totalPaid);
     return { totalTuitionDue: totalDue, remainingDebt: remaining };
   };
 
   const addStudent = (studentData: Omit<Student, 'id' | 'totalTuitionDue' | 'totalPaid' | 'remainingDebt'>): Student => {
     const id = `st-${Date.now()}`;
-    const { totalTuitionDue, remainingDebt } = calculateStudentFees(studentData.enrollments, 0);
+    const { totalTuitionDue, remainingDebt } = calculateStudentFees(studentData.enrollments, 0, studentData.tuitionWaived);
     const newStudent: Student = {
       ...studentData,
       id,
@@ -526,7 +526,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (st.id === id) {
           const updatedEnrollments = updates.enrollments || st.enrollments;
           const updatedPaid = updates.totalPaid !== undefined ? updates.totalPaid : st.totalPaid;
-          const { totalTuitionDue, remainingDebt } = calculateStudentFees(updatedEnrollments, updatedPaid);
+          const updatedWaived = updates.tuitionWaived !== undefined ? updates.tuitionWaived : st.tuitionWaived;
+          const { totalTuitionDue, remainingDebt } = calculateStudentFees(updatedEnrollments, updatedPaid, updatedWaived);
           return {
             ...st,
             ...updates,
@@ -675,13 +676,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const defaultSubjectEnrollments = (lead.interestedSubjects || []).map((subName, idx) => {
       const matchSubject = subjects.find((s) => s.name.toLowerCase() === subName.toLowerCase()) || subjects[0];
+      const gradeSpecificFee = matchSubject.gradeFees && matchSubject.gradeFees[lead.targetGrade] !== undefined
+        ? matchSubject.gradeFees[lead.targetGrade]
+        : matchSubject.defaultFee;
       return {
         id: `en-lead-${Date.now()}-${idx}`,
         subjectId: matchSubject.id,
         subjectName: matchSubject.name,
-        monthlyFee: matchSubject.defaultFee,
+        monthlyFee: gradeSpecificFee,
         discount: 0,
-        finalFee: matchSubject.defaultFee,
+        finalFee: gradeSpecificFee,
         startDate: new Date().toISOString().split('T')[0],
         status: 'active' as const,
       };

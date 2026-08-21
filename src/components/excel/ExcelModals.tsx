@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { parseCenterExcelFile, ExcelImportResult } from '../../utils/excelParser';
+import { 
+  parseCenterExcelFile, 
+  ExcelImportResult,
+  generateSampleExcelWorkbook,
+  generateSampleStudentsTemplate,
+  generateSampleExpensesTemplate,
+  generateSampleTutorsTemplate,
+  generateSampleLeadsTemplate
+} from '../../utils/excelParser';
 import {
   FileSpreadsheet,
   Upload,
   CheckCircle2,
   FileCheck,
   X,
+  Download,
+  Users,
+  Wallet,
+  HeartHandshake,
+  BookOpen,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -82,30 +95,105 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
           <div className="space-y-4">
             {/* Upload Area */}
             {!importResult ? (
-              <div className="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-8 text-center space-y-3 transition-colors bg-slate-50">
-                <FileSpreadsheet className="w-12 h-12 text-emerald-600 mx-auto" />
-                <div>
-                  <label className="cursor-pointer">
-                    <span className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-block shadow-xs transition-colors">
-                      Chọn File Excel (.xlsx)
-                    </span>
-                    <input
-                      type="file"
-                      accept=".xlsx, .xls, .csv"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Hỗ trợ file AN TÂM EDUCATION.xlsx hoặc các file xuất biểu mẫu
-                  </p>
-                </div>
-                {parsing && (
-                  <div className="text-xs text-indigo-600 font-semibold animate-pulse">
-                    Đang quét cấu trúc bảng tính và đối soát dữ liệu...
+              <>
+                {/* Download Templates Section */}
+                <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-900 uppercase tracking-wider">
+                    <Download className="w-4 h-4 text-indigo-600" />
+                    <span>TẢI FILE MẪU CHUẨN ĐỂ NHẬP LIỆU (CHỌN PHÂN HỆ PHÙ HỢP)</span>
                   </div>
-                )}
-              </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Hệ thống hỗ trợ nhập dữ liệu hàng loạt từ file Excel. Bạn chỉ cần tải file mẫu tương ứng dưới đây, điền thông tin và tải lên hệ thống.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    {/* 1. All-in-one */}
+                    <button
+                      onClick={() => generateSampleExcelWorkbook()}
+                      className="p-3 text-left bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-2xs rounded-lg transition-all cursor-pointer flex items-start gap-3 group text-slate-800"
+                    >
+                      <FileSpreadsheet className="w-5 h-5 text-emerald-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Mẫu Tổng Hợp Toàn Diện</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Bao gồm đầy đủ cả 4 phân hệ (Học sinh, Chi phí, Lead CRM, Trợ giảng)</p>
+                      </div>
+                    </button>
+
+                    {/* 2. Students */}
+                    <button
+                      onClick={() => generateSampleStudentsTemplate()}
+                      className="p-3 text-left bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-2xs rounded-lg transition-all cursor-pointer flex items-start gap-3 group text-slate-800"
+                    >
+                      <Users className="w-5 h-5 text-indigo-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Mẫu Danh Sách Học Sinh</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Nhập học sinh theo khối (Khối 6, 7, 8, 9), lớp học, thông tin phụ huynh & học phí</p>
+                      </div>
+                    </button>
+
+                    {/* 3. Expenses */}
+                    <button
+                      onClick={() => generateSampleExpensesTemplate()}
+                      className="p-3 text-left bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-2xs rounded-lg transition-all cursor-pointer flex items-start gap-3 group text-slate-800"
+                    >
+                      <Wallet className="w-5 h-5 text-rose-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Mẫu Chi Phí Vận Hành</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Nhập danh sách phiếu chi, loại chi phí, số tiền và người thanh toán thực tế</p>
+                      </div>
+                    </button>
+
+                    {/* 4. CRM Leads */}
+                    <button
+                      onClick={() => generateSampleLeadsTemplate()}
+                      className="p-3 text-left bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-2xs rounded-lg transition-all cursor-pointer flex items-start gap-3 group text-slate-800"
+                    >
+                      <HeartHandshake className="w-5 h-5 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Mẫu CRM Lead Phụ Huynh</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Đăng ký thông tin phụ huynh quan tâm, nhu cầu học tập gia sư theo yêu cầu (Biểu mẫu 2)</p>
+                      </div>
+                    </button>
+
+                    {/* 5. Tutors */}
+                    <button
+                      onClick={() => generateSampleTutorsTemplate()}
+                      className="p-3 text-left bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-2xs rounded-lg transition-all cursor-pointer flex items-start gap-3 group sm:col-span-2 text-slate-800"
+                    >
+                      <BookOpen className="w-5 h-5 text-purple-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Mẫu Tuyển Dụng Trợ Giảng / Gia Sư</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Thông tin ứng viên trợ giảng, chuyên ngành học, các môn có thể giảng dạy (Biểu mẫu 1)</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-8 text-center space-y-3 transition-colors bg-slate-50">
+                  <FileSpreadsheet className="w-12 h-12 text-emerald-600 mx-auto" />
+                  <div>
+                    <label className="cursor-pointer">
+                      <span className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-block shadow-xs transition-colors">
+                        Chọn File Excel (.xlsx)
+                      </span>
+                      <input
+                        type="file"
+                        accept=".xlsx, .xls, .csv"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <p className="text-xs text-slate-500 mt-2">
+                      Hỗ trợ file AN TÂM EDUCATION.xlsx hoặc các file xuất biểu mẫu
+                    </p>
+                  </div>
+                  {parsing && (
+                    <div className="text-xs text-indigo-600 font-semibold animate-pulse">
+                      Đang quét cấu trúc bảng tính và đối soát dữ liệu...
+                    </div>
+                  )}
+                </div>
+              </>
             ) : (
               /* Parsed Preview */
               <div className="space-y-4">

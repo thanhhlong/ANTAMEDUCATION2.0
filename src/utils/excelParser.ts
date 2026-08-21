@@ -522,6 +522,122 @@ export function generateSampleExcelWorkbook(): void {
   XLSX.writeFile(workbook, 'AN_TAM_EDUCATION_Mau_Thuc_Te.xlsx');
 }
 
+export function generateSampleStudentsTemplate(): void {
+  const workbook = XLSX.utils.book_new();
+  const k8Data = [
+    {
+      'Mã học sinh': 'AT-K8-001',
+      'Họ và tên': 'Nguyễn Minh Quân',
+      'Ngày sinh': '2012-04-15',
+      'Giới tính': 'Nam',
+      'Số điện thoại': '0912345601',
+      'Người liên hệ phụ huynh': 'Nguyễn Văn Hùng',
+      'Số điện thoại phụ huynh': '0988112201',
+      'Trường đang học': 'THCS Cầu Giấy',
+      'Lớp': '8A1',
+      'Toán': '1.000.000',
+      'Ngữ văn': '400.000',
+      'Tiếng Anh': '400.000',
+      'KHTN': '400.000',
+      'Tổng học phí': '2.200.000',
+      'Đã nộp': '2.200.000',
+      'Còn nợ': '0',
+      'Ghi chú': 'Học sinh giỏi',
+    },
+    {
+      'Mã học sinh': 'AT-K8-002',
+      'Họ và tên': 'Trần Bảo Châu',
+      'Ngày sinh': '2012-08-22',
+      'Giới tính': 'Nữ',
+      'Số điện thoại': '0912345602',
+      'Người liên hệ phụ huynh': 'Lê Thị Thu Hà',
+      'Số điện thoại phụ huynh': '0988112202',
+      'Trường đang học': 'THCS Trưng Vương',
+      'Lớp': '8A1',
+      'Toán': '1.000.000',
+      'Tiếng Anh': '400.000',
+      'Tổng học phí': '1.400.000',
+      'Đã nộp': '1.400.000',
+      'Còn nợ': '0',
+    }
+  ];
+  const wsK8 = XLSX.utils.json_to_sheet(k8Data);
+  XLSX.utils.book_append_sheet(workbook, wsK8, 'KHỐI 8');
+  XLSX.writeFile(workbook, 'AN_TAM_Mau_Hoc_Sinh_Khoi_8.xlsx');
+}
+
+export function generateSampleExpensesTemplate(): void {
+  const workbook = XLSX.utils.book_new();
+  const chiPhiData = [
+    { 'Ngày': '2026-08-01', 'Loại chi': 'Thuê nhà', 'Nội dung': 'Tiền thuê mặt bằng Cầu Giấy T8', 'Số tiền': 15000000, 'Người thanh toán': 'Giám đốc', 'Ghi chú': 'BIDV' },
+    { 'Ngày': '2026-08-03', 'Loại chi': 'Máy lạnh', 'Nội dung': 'Bảo dưỡng 4 điều hòa Daikin', 'Số tiền': 1800000, 'Người thanh toán': 'Quản lý', 'Ghi chú': '' },
+    { 'Ngày': '2026-08-10', 'Loại chi': 'Văn phòng phẩm', 'Nội dung': 'Giấy A4, bút dạ, mực in', 'Số tiền': 980000, 'Người thanh toán': 'Lễ tân', 'Ghi chú': '' }
+  ];
+  const wsChiPhi = XLSX.utils.json_to_sheet(chiPhiData);
+  XLSX.utils.book_append_sheet(workbook, wsChiPhi, 'CHI PHÍ');
+  XLSX.writeFile(workbook, 'AN_TAM_Mau_Chi_Phi_Van_Hanh.xlsx');
+}
+
+export function generateSampleTutorsTemplate(): void {
+  const workbook = XLSX.utils.book_new();
+  const bieuMau1Data = [
+    {
+      'Họ và tên': 'Nguyễn Thùy Linh',
+      'Số điện thoại': '0966778899',
+      'Email': 'linh.sp@gmail.com',
+      'Trường đại học': 'ĐH Sư Phạm Hà Nội',
+      'Chuyên ngành': 'Sư phạm Toán học CLC',
+      'Môn có thể trợ giảng': 'Toán học, Khoa học tự nhiên',
+      'Kinh nghiệm': '2 năm trợ giảng',
+      'Mong muốn': 'Làm việc lâu dài tại trung tâm',
+    },
+    {
+      'Họ và tên': 'Phạm Hoàng Nam',
+      'Số điện thoại': '0912345678',
+      'Email': 'nam.ph@gmail.com',
+      'Trường đại học': 'ĐH Bách Khoa Hà Nội',
+      'Chuyên ngành': 'Kỹ thuật Điện',
+      'Môn có thể trợ giảng': 'Vật lý, Toán học',
+      'Kinh nghiệm': 'Gia sư lớp 9 thi vào 10',
+      'Mong muốn': 'Lịch dạy buổi tối linh hoạt',
+    }
+  ];
+  const wsBieuMau1 = XLSX.utils.json_to_sheet(bieuMau1Data);
+  XLSX.utils.book_append_sheet(workbook, wsBieuMau1, 'Câu trả lời biểu mẫu 1');
+  XLSX.writeFile(workbook, 'AN_TAM_Mau_Tro_Giang_Ung_Tuyen.xlsx');
+}
+
+export function generateSampleLeadsTemplate(): void {
+  const workbook = XLSX.utils.book_new();
+  const bieuMau2Data = [
+    {
+      'Họ tên phụ huynh': 'Nguyễn Thị Bích Thủy',
+      'Họ tên học sinh': 'Nguyễn Đức Anh',
+      'Số điện thoại/Zalo': '0977223344',
+      'Trường đang học': 'THCS Giảng Võ',
+      'Khối dự kiến': 'Khối 8',
+      'Môn quan tâm': 'Toán học, Khoa học tự nhiên',
+      'Nhu cầu học tập theo yêu cầu': 'Lấy lại căn bản Đại số & Hình học đầu năm',
+      'Khung thời gian mong muốn': 'Tối Thứ 3, Chiều Thứ 7',
+      'Nguồn biết đến': 'Facebook',
+    },
+    {
+      'Họ tên phụ huynh': 'Lê Minh Tuấn',
+      'Họ tên học sinh': 'Lê Minh Hằng',
+      'Số điện thoại/Zalo': '0912998877',
+      'Trường đang học': 'THCS Cầu Giấy',
+      'Khối dự kiến': 'Khối 9',
+      'Môn quan tâm': 'Tiếng Anh, Ngữ Văn',
+      'Nhu cầu học tập theo yêu cầu': 'Ôn thi chuyên Anh vào 10',
+      'Khung thời gian mong muốn': 'Chiều Chủ Nhật',
+      'Nguồn biết đến': 'Người quen giới thiệu',
+    }
+  ];
+  const wsBieuMau2 = XLSX.utils.json_to_sheet(bieuMau2Data);
+  XLSX.utils.book_append_sheet(workbook, wsBieuMau2, 'Câu trả lời biểu mẫu 2');
+  XLSX.writeFile(workbook, 'AN_TAM_Mau_Tuyen_Sinh_CRM_Leads.xlsx');
+}
+
 // Aliases for seamless imports across components
 export const parseCenterExcelFile = async (
   file: File,

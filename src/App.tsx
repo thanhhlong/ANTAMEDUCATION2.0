@@ -15,13 +15,14 @@ import { LMSManager } from './components/lms/LMSManager';
 import { ParentPortal } from './components/parent/ParentPortal';
 import { TeacherWorkspace } from './components/teacher/TeacherWorkspace';
 import { RolePermissionManager } from './components/admin/RolePermissionManager';
+import { SubjectManager } from './components/subjects/SubjectManager';
 import { PaymentModal } from './components/finance/PaymentModal';
 import { ExcelImportModal } from './components/excel/ExcelModals';
 import { PublicRegistrationForm } from './components/public/PublicRegistrationForm';
 import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileModal } from './components/auth/UserProfileModal';
 import { LoginPage } from './components/auth/LoginPage';
-import { generateCenterExcelExport } from './utils/excelParser';
+import { generateCenterExcelExport, generateSampleExcelWorkbook } from './utils/excelParser';
 
 const MainAppContent: React.FC = () => {
   const {
@@ -41,6 +42,7 @@ const MainAppContent: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Automatically adjust default tab when role switches or user logs in
   React.useEffect(() => {
@@ -74,8 +76,7 @@ const MainAppContent: React.FC = () => {
 
   // Download Sample Template Handler
   const handleDownloadTemplate = () => {
-    generateCenterExcelExport(students, invoices, expenses, leads, tutors, scheduleSessions);
-    alert('Đã tải xuống file mẫu AN TÂM EDUCATION.xlsx thành công!');
+    generateSampleExcelWorkbook();
   };
 
   // Navigation callbacks
@@ -111,6 +112,7 @@ const MainAppContent: React.FC = () => {
         onOpenPublicForm={() => setIsPublicFormOpen(true)}
         onOpenLogin={() => setIsLoginPageView(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        onToggleSidebar={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
       />
 
       {/* Main Body */}
@@ -121,6 +123,8 @@ const MainAppContent: React.FC = () => {
           setActiveTab={setActiveTab}
           collapsed={sidebarCollapsed}
           setCollapsed={setSidebarCollapsed}
+          isMobileOpen={isMobileMenuOpen}
+          onCloseMobile={() => setIsMobileMenuOpen(false)}
         />
 
         {/* Content Viewport */}
@@ -189,6 +193,8 @@ const MainAppContent: React.FC = () => {
               onNavigateToTutoring={handleNavigateToTutoring}
             />
           )}
+
+          {activeTab === 'subjects' && <SubjectManager />}
         </main>
       </div>
 
