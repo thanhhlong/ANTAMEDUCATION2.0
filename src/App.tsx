@@ -17,10 +17,12 @@ import { ParentPortal } from './components/parent/ParentPortal';
 import { PaymentModal } from './components/finance/PaymentModal';
 import { ExcelImportModal } from './components/excel/ExcelModals';
 import { PublicRegistrationForm } from './components/public/PublicRegistrationForm';
+import { AuthModal } from './components/auth/AuthModal';
+import { UserProfileModal } from './components/auth/UserProfileModal';
 import { generateCenterExcelExport } from './utils/excelParser';
 
 const MainAppContent: React.FC = () => {
-  const { students, invoices, expenses, leads, tutors, scheduleSessions, currentRole } = useApp();
+  const { students, invoices, expenses, leads, tutors, scheduleSessions, isAuthModalOpen, setIsAuthModalOpen } = useApp();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -29,6 +31,7 @@ const MainAppContent: React.FC = () => {
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isPublicFormOpen, setIsPublicFormOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [targetTutoringLeadId, setTargetTutoringLeadId] = useState<string | undefined>(undefined);
   const [targetAttendanceSessionId, setTargetAttendanceSessionId] = useState<string | undefined>(undefined);
 
@@ -63,6 +66,8 @@ const MainAppContent: React.FC = () => {
         onOpenAIReport={() => setActiveTab('ai_insights')}
         onDownloadTemplate={handleDownloadTemplate}
         onOpenPublicForm={() => setIsPublicFormOpen(true)}
+        onOpenLogin={() => setIsAuthModalOpen(true)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
       />
 
       {/* Main Body */}
@@ -155,6 +160,21 @@ const MainAppContent: React.FC = () => {
         <PublicRegistrationForm
           isOpen={isPublicFormOpen}
           onClose={() => setIsPublicFormOpen(false)}
+        />
+      )}
+
+      {isAuthModalOpen && (
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+      )}
+
+      {isProfileModalOpen && (
+        <UserProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          onOpenLoginModal={() => setIsAuthModalOpen(true)}
         />
       )}
     </div>

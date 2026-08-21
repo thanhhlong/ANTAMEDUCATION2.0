@@ -384,3 +384,21 @@ export interface AIInsightReport {
   conversionOptimization: string[];
   classRecommendations: string[];
 }
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  email: string;
+  phone?: string;
+  fullName: string;
+  role: UserRole;
+  avatarUrl?: string;
+  title: string;
+  department?: string;
+  grade?: number;
+  studentCode?: string;
+  password?: string;
+  lastLogin?: string;
+  createdAt: string;
+}
+

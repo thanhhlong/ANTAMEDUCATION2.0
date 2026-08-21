@@ -17,6 +17,7 @@ import {
   PaymentTransaction,
   LeadStatus,
   TutorStatus,
+  AuthUser,
 } from '../types';
 import {
   INITIAL_STUDENTS,
@@ -32,10 +33,24 @@ import {
   INITIAL_LMS_LESSONS,
   INITIAL_ASSIGNMENTS,
   INITIAL_SUBMISSIONS,
+  INITIAL_AUTH_USERS,
 } from '../data/initialData';
 import { ExcelImportResult } from '../utils/excelParser';
 
 interface AppContextType {
+  // Authentication & Session
+  currentUser: AuthUser | null;
+  users: AuthUser[];
+  isAuthenticated: boolean;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
+  login: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string }>;
+  quickLoginAsRole: (role: UserRole) => void;
+  logout: () => void;
+  registerUser: (data: Omit<AuthUser, 'id' | 'createdAt'> & { password: string }) => Promise<{ success: boolean; message?: string }>;
+  updateUserProfile: (updates: Partial<AuthUser>) => void;
+  changePassword: (oldPass: string, newPass: string) => Promise<{ success: boolean; message?: string }>;
+
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
   selectedGrade: number | 'all';
@@ -98,7 +113,28 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const STORAGE_KEY = 'antam_education_app_state_v2';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentRole, setCurrentRole] = useState<UserRole>('SUPER_ADMIN');
+  const [users, setUsers] = useState<AuthUser[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}_users`);
+    return saved ? JSON.parse(saved) : INITIAL_AUTH_USERS;
+  });
+
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}_currentUser`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return INITIAL_AUTH_USERS[0];
+      }
+    }
+    return INITIAL_AUTH_USERS[0];
+  });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    return currentUser ? currentUser.role : 'SUPER_ADMIN';
+  });
   const [selectedGrade, setSelectedGrade] = useState<number | 'all'>('all');
 
   const [students, setStudents] = useState<Student[]>(() => {
@@ -206,6 +242,158 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_submissions`, JSON.stringify(submissions));
   }, [submissions]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_KEY}_users`, JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem(`${STORAGE_KEY}_currentUser`, JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem(`${STORAGE_KEY}_currentUser`);
+    }
+  }, [currentUser]);
+
+  // Auth Handlers
+  const login = async (identifier: string, password?: string): Promise<{ success: boolean; message?: string }> => {
+    const q = identifier.trim().toLowerCase();
+    if (!q) {
+      return { success: false, message: 'Vui lòng nhập email, số điện thoại hoặc mã học sinh' };
+    }
+
+    // 1. Check in registered users list
+    let matchedUser = users.find(
+      (u) =>
+        u.email.toLowerCase() === q ||
+        u.username.toLowerCase() === q ||
+        (u.phone && u.phone.includes(q)) ||
+        (u.studentCode && u.studentCode.toLowerCase() === q)
+    );
+
+    // 2. If not found in users list, check in students directory to allow immediate student/parent login
+    if (!matchedUser) {
+      const studentMatch = students.find(
+        (s) =>
+          s.code.toLowerCase() === q ||
+          s.email.toLowerCase() === q ||
+          s.phone === q ||
+          s.parentPhone === q
+      );
+
+      if (studentMatch) {
+        const isParent = studentMatch.parentPhone === q;
+        matchedUser = {
+          id: isParent ? `usr-parent-${studentMatch.id}` : `usr-student-${studentMatch.id}`,
+          username: isParent ? `ph.${studentMatch.code.toLowerCase()}` : `hs.${studentMatch.code.toLowerCase()}`,
+          email: isParent ? (studentMatch.parentEmail || `${studentMatch.code.toLowerCase()}@parent.antam.edu.vn`) : studentMatch.email,
+          phone: isParent ? studentMatch.parentPhone : studentMatch.phone,
+          fullName: isParent ? studentMatch.parentName : studentMatch.fullName,
+          role: isParent ? 'PARENT' : 'STUDENT',
+          title: isParent
+            ? `Phụ huynh em ${studentMatch.fullName} (${studentMatch.className})`
+            : `Học sinh Lớp ${studentMatch.className} (Khối ${studentMatch.grade})`,
+          grade: studentMatch.grade,
+          studentCode: studentMatch.code,
+          password: '123',
+          createdAt: studentMatch.joinedDate || new Date().toISOString().split('T')[0],
+          lastLogin: new Date().toLocaleString('vi-VN'),
+        };
+        // Add to users list
+        setUsers((prev) => [...prev, matchedUser!]);
+      }
+    }
+
+    if (!matchedUser) {
+      return { success: false, message: 'Không tìm thấy tài khoản với thông tin đã nhập' };
+    }
+
+    // Validate password if user has password set (allow demo password bypass)
+    if (password && matchedUser.password && matchedUser.password !== password && password !== '123' && password !== '123456') {
+      return { success: false, message: 'Mật khẩu không chính xác. Mật khẩu mẫu là 123 hoặc 123456' };
+    }
+
+    const updatedUser = {
+      ...matchedUser,
+      lastLogin: new Date().toLocaleString('vi-VN'),
+    };
+
+    setCurrentUser(updatedUser);
+    setCurrentRole(updatedUser.role);
+    if (updatedUser.grade) {
+      setSelectedGrade(updatedUser.grade);
+    }
+    setIsAuthModalOpen(false);
+
+    return { success: true, message: `Chào mừng ${updatedUser.fullName} quay trở lại!` };
+  };
+
+  const quickLoginAsRole = (role: UserRole) => {
+    const roleUser = users.find((u) => u.role === role) || INITIAL_AUTH_USERS.find((u) => u.role === role);
+    if (roleUser) {
+      const updated = {
+        ...roleUser,
+        lastLogin: new Date().toLocaleString('vi-VN'),
+      };
+      setCurrentUser(updated);
+      setCurrentRole(role);
+      if (updated.grade) {
+        setSelectedGrade(updated.grade);
+      }
+    } else {
+      setCurrentRole(role);
+    }
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem(`${STORAGE_KEY}_currentUser`);
+  };
+
+  const registerUser = async (data: Omit<AuthUser, 'id' | 'createdAt'> & { password: string }): Promise<{ success: boolean; message?: string }> => {
+    const existing = users.find(
+      (u) => u.email.toLowerCase() === data.email.toLowerCase() || (data.phone && u.phone === data.phone)
+    );
+    if (existing) {
+      return { success: false, message: 'Email hoặc số điện thoại đã được đăng ký tài khoản khác' };
+    }
+
+    const newUser: AuthUser = {
+      ...data,
+      id: `usr-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+      lastLogin: new Date().toLocaleString('vi-VN'),
+    };
+
+    setUsers((prev) => [newUser, ...prev]);
+    setCurrentUser(newUser);
+    setCurrentRole(newUser.role);
+    if (newUser.grade) {
+      setSelectedGrade(newUser.grade);
+    }
+    setIsAuthModalOpen(false);
+
+    return { success: true, message: 'Tạo tài khoản và đăng nhập thành công!' };
+  };
+
+  const updateUserProfile = (updates: Partial<AuthUser>) => {
+    if (!currentUser) return;
+    const updated = { ...currentUser, ...updates };
+    setCurrentUser(updated);
+    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+  };
+
+  const changePassword = async (oldPass: string, newPass: string): Promise<{ success: boolean; message?: string }> => {
+    if (!currentUser) return { success: false, message: 'Chưa đăng nhập' };
+    if (currentUser.password && currentUser.password !== oldPass && oldPass !== '123' && oldPass !== '123456') {
+      return { success: false, message: 'Mật khẩu cũ không chính xác' };
+    }
+    if (!newPass || newPass.length < 3) {
+      return { success: false, message: 'Mật khẩu mới phải có ít nhất 3 ký tự' };
+    }
+    updateUserProfile({ password: newPass });
+    return { success: true, message: 'Đổi mật khẩu thành công!' };
+  };
 
   // Recalculate student total tuition
   const calculateStudentFees = (enrollments: Student['enrollments'], totalPaid: number) => {
@@ -729,6 +917,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        currentUser,
+        users,
+        isAuthenticated: !!currentUser,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
+        login,
+        quickLoginAsRole,
+        logout,
+        registerUser,
+        updateUserProfile,
+        changePassword,
         currentRole,
         setCurrentRole,
         selectedGrade,
