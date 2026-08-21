@@ -130,17 +130,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_AUTH_USERS;
   });
 
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_currentUser`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return INITIAL_AUTH_USERS[0];
-      }
-    }
-    return INITIAL_AUTH_USERS[0];
-  });
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isLoginPageView, setIsLoginPageView] = useState<boolean>(false);

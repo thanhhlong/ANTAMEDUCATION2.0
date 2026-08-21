@@ -16,6 +16,7 @@ import { ParentPortal } from './components/parent/ParentPortal';
 import { TeacherWorkspace } from './components/teacher/TeacherWorkspace';
 import { RolePermissionManager } from './components/admin/RolePermissionManager';
 import { SubjectManager } from './components/subjects/SubjectManager';
+import { TeacherPayroll } from './components/finance/TeacherPayroll';
 import { PaymentModal } from './components/finance/PaymentModal';
 import { ExcelImportModal } from './components/excel/ExcelModals';
 import { PublicRegistrationForm } from './components/public/PublicRegistrationForm';
@@ -97,7 +98,6 @@ const MainAppContent: React.FC = () => {
     return (
       <LoginPage
         onLoginSuccess={() => setIsLoginPageView(false)}
-        onContinueAsGuest={() => setIsLoginPageView(false)}
       />
     );
   }
@@ -195,6 +195,8 @@ const MainAppContent: React.FC = () => {
           )}
 
           {activeTab === 'subjects' && <SubjectManager />}
+
+          {activeTab === 'teacher_payroll' && <TeacherPayroll />}
         </main>
       </div>
 

@@ -20,6 +20,7 @@ import {
   LogIn,
   LogOut,
   X,
+  Coins,
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -37,7 +38,8 @@ export type ActiveTab =
   | 'lms'
   | 'ai_insights'
   | 'parent_portal'
-  | 'subjects';
+  | 'subjects'
+  | 'teacher_payroll';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -114,6 +116,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ReceiptText,
       badge: `${expenses.length}`,
       badgeColor: 'bg-slate-100 text-slate-600 border-slate-200',
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'],
+    },
+    {
+      id: 'teacher_payroll',
+      label: 'Chi Trả Giáo Viên',
+      icon: Coins,
       roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'],
     },
     {
