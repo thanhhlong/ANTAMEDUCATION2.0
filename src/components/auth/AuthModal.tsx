@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { UserRole } from '../../types';
+import { AnTamLogo } from '../common/AnTamLogo';
 import {
   LogIn,
   X,
@@ -260,17 +261,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative text-slate-800 my-auto">
         {/* Modal Header */}
-        <div className="bg-slate-900 text-white px-6 py-5 flex items-center justify-between relative">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-black text-white text-lg shadow-sm border border-indigo-400/30">
-              AT
+        <div className="bg-slate-900 text-white px-6 py-5 flex items-center justify-between relative border-b border-slate-800">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-white p-1 flex items-center justify-center shadow-md shrink-0 border border-slate-200">
+              <AnTamLogo size="sm" variant="icon" showText={false} className="w-full h-full" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white tracking-tight">
-                  ANTAM EDUCATION
+                  AN TÂM EDUCATION
                 </h3>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                   HỆ THỐNG NỘI BỘ
                 </span>
               </div>
@@ -337,7 +338,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+          {/* Centered Brand Presentation */}
+          <div className="flex flex-col items-center justify-center pt-1 pb-3 text-center border-b border-slate-100">
+            <AnTamLogo size="lg" variant="full" showText={true} />
+          </div>
+
           {/* Notifications */}
           {errorMessage && (
             <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">

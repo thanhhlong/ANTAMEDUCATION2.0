@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { UserRole } from '../../types';
+import { AnTamLogo } from './AnTamLogo';
 import {
   Sparkles,
   FileSpreadsheet,
@@ -49,15 +50,15 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="px-3 lg:px-6 py-2 flex items-center justify-between gap-3">
         {/* Zone 1: Brand Title */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-white shadow-xs text-sm">
-            AT
+          <div className="w-8 h-8 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-xs border border-slate-200">
+            <AnTamLogo size="sm" variant="icon" showText={false} className="w-full h-full" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold tracking-tight text-slate-900 text-sm lg:text-base">
-                ANTAM EDUCATION
+                AN TÂM EDUCATION
               </span>
-              <span className="text-[9px] uppercase font-bold tracking-wider px-1 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <span className="text-[9px] uppercase font-bold tracking-wider px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
                 2.0 PRO
               </span>
             </div>
