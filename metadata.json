@@ -1,0 +1,6 @@
+{
+  "name": "ANTAMEDUCATION 2.0 - Hệ Thống Quản Trị Giáo Dục Toàn Diện",
+  "description": "Nền tảng quản lý trung tâm giáo dục, LMS, CRM, Học phí & Chi phí, Thời khóa biểu, Điểm danh, Gia sư theo yêu cầu và Trí tuệ nhân tạo AI",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

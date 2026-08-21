@@ -1,0 +1,157 @@
+import React from 'react';
+import { useApp } from '../../context/AppContext';
+import { UserRole } from '../../types';
+import {
+  Sparkles,
+  FileSpreadsheet,
+  Download,
+  Upload,
+  UserCheck,
+  Shield,
+  GraduationCap,
+  Users,
+  BookOpen,
+} from 'lucide-react';
+
+interface NavbarProps {
+  onOpenImport: () => void;
+  onOpenExport: () => void;
+  onOpenAIReport: () => void;
+  onDownloadTemplate: () => void;
+  onOpenPublicForm: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+  onOpenImport,
+  onOpenExport,
+  onOpenAIReport,
+  onDownloadTemplate,
+  onOpenPublicForm,
+}) => {
+  const { currentRole, setCurrentRole, selectedGrade, setSelectedGrade } = useApp();
+
+  const roleOptions: { role: UserRole; label: string; icon: any }[] = [
+    { role: 'SUPER_ADMIN', label: 'Quản trị viên', icon: Shield },
+    { role: 'TEACHER', label: 'Giáo viên', icon: BookOpen },
+    { role: 'TUTOR', label: 'Trợ giảng', icon: UserCheck },
+    { role: 'PARENT', label: 'Phụ huynh', icon: Users },
+    { role: 'STUDENT', label: 'Học sinh', icon: GraduationCap },
+  ];
+
+  return (
+    <header className="sticky top-0 z-30 bg-white border-b border-slate-200 text-slate-800 shadow-2xs">
+      <div className="px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4">
+        {/* Zone 1: Brand Title */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-xs text-lg">
+            AT
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold tracking-tight text-slate-900 text-base lg:text-lg">
+                ANTAM EDUCATION
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                2.0 PRO
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+              Hệ thống điều hành trung tâm
+            </p>
+          </div>
+        </div>
+
+        {/* Zone 2: Role Switcher & Grade Quick Filter */}
+        <div className="hidden md:flex items-center gap-2">
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            {roleOptions.map((opt) => {
+              const Icon = opt.icon;
+              const isActive = currentRole === opt.role;
+              return (
+                <button
+                  key={opt.role}
+                  onClick={() => setCurrentRole(opt.role)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                    isActive
+                      ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Grade Quick Filter */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+            <span className="px-2 text-slate-500 font-medium text-[11px]">Khối:</span>
+            {[
+              { id: 'all', label: 'Tất cả' },
+              { id: 6, label: 'K6' },
+              { id: 7, label: 'K7' },
+              { id: 8, label: 'K8' },
+              { id: 9, label: 'K9' },
+            ].map((g) => (
+              <button
+                key={g.id}
+                onClick={() => setSelectedGrade(g.id as any)}
+                className={`px-2 py-1 rounded text-xs transition-all font-medium ${
+                  selectedGrade === g.id
+                    ? 'bg-indigo-600 text-white font-semibold shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Zone 3: Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onOpenPublicForm}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+          >
+            <span>Form Đăng Ký</span>
+          </button>
+
+          <button
+            onClick={onDownloadTemplate}
+            title="Tải file Excel mẫu nghiệp vụ trung tâm"
+            className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Mẫu Excel</span>
+          </button>
+
+          <button
+            onClick={onOpenImport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+          >
+            <Upload className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="hidden sm:inline">Nhập Excel</span>
+          </button>
+
+          <button
+            onClick={onOpenExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-600" />
+            <span className="hidden sm:inline">Xuất Báo Cáo</span>
+          </button>
+
+          <button
+            onClick={onOpenAIReport}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>AI Cố Vấn</span>
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+};
