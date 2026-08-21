@@ -14,14 +14,18 @@ import {
   TrendingUp,
   HeartHandshake,
   ChevronRight,
+  ShieldCheck,
+  Briefcase,
 } from 'lucide-react';
 
 export type ActiveTab =
   | 'overview'
+  | 'teacher_workspace'
   | 'students'
   | 'finance'
   | 'expenses'
   | 'crm'
+  | 'user_roles'
   | 'tutoring'
   | 'tutors'
   | 'timetable'
@@ -66,6 +70,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'ACCOUNTANT'],
     },
     {
+      id: 'teacher_workspace',
+      label: 'Bàn Làm Việc & Lịch Dạy',
+      icon: Briefcase,
+      highlight: true,
+      roles: ['TEACHER'],
+    },
+    {
       id: 'crm',
       label: 'CRM & Tuyển Sinh',
       icon: UserPlus,
@@ -75,9 +86,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'students',
-      label: 'Học Sinh & Đăng Ký',
+      label: currentRole === 'TEACHER' ? 'Học Sinh Lớp Phụ Trách' : 'Học Sinh & Đăng Ký',
       icon: Users,
-      badge: '58',
+      badge: currentRole === 'TEACHER' ? undefined : '58',
       roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'ACCOUNTANT', 'TEACHER'],
     },
     {
@@ -95,6 +106,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: `${expenses.length}`,
       badgeColor: 'bg-slate-100 text-slate-600 border-slate-200',
       roles: ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT'],
+    },
+    {
+      id: 'user_roles',
+      label: 'Phân Quyền & Tài Khoản',
+      icon: ShieldCheck,
+      roles: ['SUPER_ADMIN', 'ADMIN'],
     },
   ];
 
@@ -162,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             {!collapsed && (
               <div className="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Quản Trị Hệ Thống
+                {currentRole === 'TEACHER' ? 'Bàn Làm Việc Giáo Viên' : 'Quản Trị Hệ Thống'}
               </div>
             )}
             {visibleSystem.map((item) => {

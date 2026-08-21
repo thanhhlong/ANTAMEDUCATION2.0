@@ -18,6 +18,7 @@ import {
   LeadStatus,
   TutorStatus,
   AuthUser,
+  PermissionKey,
 } from '../types';
 import {
   INITIAL_STUDENTS,
@@ -34,6 +35,7 @@ import {
   INITIAL_ASSIGNMENTS,
   INITIAL_SUBMISSIONS,
   INITIAL_AUTH_USERS,
+  ROLE_PERMISSION_CONFIGS,
 } from '../data/initialData';
 import { ExcelImportResult } from '../utils/excelParser';
 
@@ -102,6 +104,13 @@ interface AppContextType {
   addAssignment: (assignment: Omit<LMSAssignment, 'id' | 'submissionsCount' | 'createdAt'>) => void;
   submitAssignmentAnswers: (assignmentId: string, studentId: string, studentName: string, answers: { questionId: string; selectedOption?: number; textAnswer?: string }[]) => void;
   gradeSubmission: (submissionId: string, score: number, feedback: string, teacherName: string) => void;
+
+  // Role & Permissions
+  hasPermission: (permission: PermissionKey) => boolean;
+  addNewUser: (user: Omit<AuthUser, 'id' | 'createdAt'>) => AuthUser;
+  updateUser: (id: string, updates: Partial<AuthUser>) => void;
+  deleteUser: (id: string) => void;
+  toggleUserStatus: (id: string) => void;
 
   // Excel Import
   importExcelData: (data: ExcelImportResult, duplicateAction: 'merge' | 'create_new' | 'skip') => { addedStudents: number; addedExpenses: number; addedLeads: number; addedTutors: number };
@@ -393,6 +402,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     updateUserProfile({ password: newPass });
     return { success: true, message: 'Đổi mật khẩu thành công!' };
+  };
+
+  // Permissions & Role Access Control
+  const hasPermission = (permission: PermissionKey): boolean => {
+    if (!currentRole) return false;
+    if (currentRole === 'SUPER_ADMIN') return true;
+    if (currentUser?.customPermissions && currentUser.customPermissions.includes(permission)) {
+      return true;
+    }
+    const config = ROLE_PERMISSION_CONFIGS.find((c) => c.role === currentRole);
+    return config ? config.permissions.includes(permission) : false;
+  };
+
+  const addNewUser = (userData: Omit<AuthUser, 'id' | 'createdAt'>): AuthUser => {
+    const newUser: AuthUser = {
+      ...userData,
+      id: `usr-${Date.now()}`,
+      isActive: userData.isActive !== undefined ? userData.isActive : true,
+      createdAt: new Date().toISOString().split('T')[0],
+      lastLogin: 'Chưa đăng nhập',
+    };
+    setUsers((prev) => [newUser, ...prev]);
+    return newUser;
+  };
+
+  const updateUser = (id: string, updates: Partial<AuthUser>) => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === id) {
+          const updated = { ...u, ...updates };
+          if (currentUser && currentUser.id === id) {
+            setCurrentUser(updated);
+          }
+          return updated;
+        }
+        return u;
+      })
+    );
+  };
+
+  const deleteUser = (id: string) => {
+    setUsers((prev) => prev.filter((u) => u.id !== id));
+  };
+
+  const toggleUserStatus = (id: string) => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === id) {
+          const updated = { ...u, isActive: !u.isActive };
+          if (currentUser && currentUser.id === id) {
+            setCurrentUser(updated);
+          }
+          return updated;
+        }
+        return u;
+      })
+    );
   };
 
   // Recalculate student total tuition
@@ -966,6 +1032,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addAssignment,
         submitAssignmentAnswers,
         gradeSubmission,
+        hasPermission,
+        addNewUser,
+        updateUser,
+        deleteUser,
+        toggleUserStatus,
         importExcelData,
         resetAllData,
       }}

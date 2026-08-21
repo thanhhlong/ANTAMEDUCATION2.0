@@ -397,8 +397,37 @@ export interface AuthUser {
   department?: string;
   grade?: number;
   studentCode?: string;
+  assignedClasses?: string[]; // e.g. ['8A1', '8A2', '9A1']
+  teachingSubjects?: string[]; // e.g. ['sub-toan', 'sub-khtn']
   password?: string;
+  isActive?: boolean;
+  customPermissions?: string[];
   lastLogin?: string;
   createdAt: string;
+}
+
+export type PermissionKey =
+  | 'VIEW_DASHBOARD'
+  | 'MANAGE_STUDENTS'
+  | 'VIEW_ALL_STUDENTS'
+  | 'MANAGE_FINANCE'
+  | 'VIEW_FINANCE'
+  | 'MANAGE_EXPENSES'
+  | 'MANAGE_CRM'
+  | 'MANAGE_TIMETABLE'
+  | 'MANAGE_ATTENDANCE'
+  | 'MANAGE_LMS'
+  | 'GRADE_SUBMISSIONS'
+  | 'MANAGE_TUTORING'
+  | 'MANAGE_USERS'
+  | 'VIEW_AI_INSIGHTS';
+
+export interface RolePermissionConfig {
+  role: UserRole;
+  roleName: string;
+  description: string;
+  color: string;
+  badgeBg: string;
+  permissions: PermissionKey[];
 }
 

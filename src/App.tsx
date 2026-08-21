@@ -14,6 +14,8 @@ import { AttendanceManager } from './components/attendance/AttendanceManager';
 import { LMSManager } from './components/lms/LMSManager';
 import { AIBusinessAdvisor } from './components/ai/AIBusinessAdvisor';
 import { ParentPortal } from './components/parent/ParentPortal';
+import { TeacherWorkspace } from './components/teacher/TeacherWorkspace';
+import { RolePermissionManager } from './components/admin/RolePermissionManager';
 import { PaymentModal } from './components/finance/PaymentModal';
 import { ExcelImportModal } from './components/excel/ExcelModals';
 import { PublicRegistrationForm } from './components/public/PublicRegistrationForm';
@@ -22,10 +24,37 @@ import { UserProfileModal } from './components/auth/UserProfileModal';
 import { generateCenterExcelExport } from './utils/excelParser';
 
 const MainAppContent: React.FC = () => {
-  const { students, invoices, expenses, leads, tutors, scheduleSessions, isAuthModalOpen, setIsAuthModalOpen } = useApp();
+  const {
+    students,
+    invoices,
+    expenses,
+    leads,
+    tutors,
+    scheduleSessions,
+    currentRole,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+  } = useApp();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Automatically adjust default tab when role switches or user logs in
+  React.useEffect(() => {
+    if (currentRole === 'TEACHER') {
+      setActiveTab('teacher_workspace');
+    } else if (currentRole === 'PARENT') {
+      setActiveTab('parent_portal');
+    } else if (currentRole === 'STUDENT') {
+      setActiveTab('lms');
+    } else if (currentRole === 'ACCOUNTANT') {
+      setActiveTab('finance');
+    } else if (currentRole === 'SUPER_ADMIN' || currentRole === 'ADMIN') {
+      if (activeTab === 'teacher_workspace') {
+        setActiveTab('overview');
+      }
+    }
+  }, [currentRole]);
 
   // Modals state
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
@@ -52,8 +81,10 @@ const MainAppContent: React.FC = () => {
     setActiveTab('tutoring');
   };
 
-  const handleTakeAttendance = (sessionId: string) => {
-    setTargetAttendanceSessionId(sessionId);
+  const handleTakeAttendance = (sessionId?: string) => {
+    if (sessionId) {
+      setTargetAttendanceSessionId(sessionId);
+    }
     setActiveTab('attendance');
   };
 
@@ -92,6 +123,17 @@ const MainAppContent: React.FC = () => {
               onOpenAIAdvisor={() => setActiveTab('ai_insights')}
             />
           )}
+
+          {activeTab === 'teacher_workspace' && (
+            <TeacherWorkspace
+              onNavigateToAttendance={handleTakeAttendance}
+              onNavigateToLMS={() => setActiveTab('lms')}
+              onNavigateToTimetable={() => setActiveTab('timetable')}
+              onNavigateToStudents={() => setActiveTab('students')}
+            />
+          )}
+
+          {activeTab === 'user_roles' && <RolePermissionManager />}
 
           {activeTab === 'students' && (
             <StudentManager
