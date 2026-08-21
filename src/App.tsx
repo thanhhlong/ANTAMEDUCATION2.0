@@ -21,6 +21,7 @@ import { ExcelImportModal } from './components/excel/ExcelModals';
 import { PublicRegistrationForm } from './components/public/PublicRegistrationForm';
 import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileModal } from './components/auth/UserProfileModal';
+import { LoginPage } from './components/auth/LoginPage';
 import { generateCenterExcelExport } from './utils/excelParser';
 
 const MainAppContent: React.FC = () => {
@@ -32,8 +33,11 @@ const MainAppContent: React.FC = () => {
     tutors,
     scheduleSessions,
     currentRole,
+    currentUser,
     isAuthModalOpen,
     setIsAuthModalOpen,
+    isLoginPageView,
+    setIsLoginPageView,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -88,6 +92,16 @@ const MainAppContent: React.FC = () => {
     setActiveTab('attendance');
   };
 
+  // If user requested the dedicated Login Page or is logged out, render standalone LoginPage
+  if (isLoginPageView || !currentUser) {
+    return (
+      <LoginPage
+        onLoginSuccess={() => setIsLoginPageView(false)}
+        onContinueAsGuest={() => setIsLoginPageView(false)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-indigo-600 selection:text-white">
       {/* Top Navbar */}
@@ -97,7 +111,7 @@ const MainAppContent: React.FC = () => {
         onOpenAIReport={() => setActiveTab('ai_insights')}
         onDownloadTemplate={handleDownloadTemplate}
         onOpenPublicForm={() => setIsPublicFormOpen(true)}
-        onOpenLogin={() => setIsAuthModalOpen(true)}
+        onOpenLogin={() => setIsLoginPageView(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
       />
 

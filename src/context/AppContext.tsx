@@ -46,7 +46,10 @@ interface AppContextType {
   isAuthenticated: boolean;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
+  isLoginPageView: boolean;
+  setIsLoginPageView: (show: boolean) => void;
   login: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string }>;
+  loginUser: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string }>;
   quickLoginAsRole: (role: UserRole) => void;
   logout: () => void;
   registerUser: (data: Omit<AuthUser, 'id' | 'createdAt'> & { password: string }) => Promise<{ success: boolean; message?: string }>;
@@ -140,6 +143,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isLoginPageView, setIsLoginPageView] = useState<boolean>(false);
 
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
     return currentUser ? currentUser.role : 'SUPER_ADMIN';
@@ -333,9 +337,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedGrade(updatedUser.grade);
     }
     setIsAuthModalOpen(false);
+    setIsLoginPageView(false);
 
     return { success: true, message: `Chào mừng ${updatedUser.fullName} quay trở lại!` };
   };
+
+  const loginUser = login;
 
   const quickLoginAsRole = (role: UserRole) => {
     const roleUser = users.find((u) => u.role === role) || INITIAL_AUTH_USERS.find((u) => u.role === role);
@@ -352,10 +359,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       setCurrentRole(role);
     }
+    setIsLoginPageView(false);
   };
 
   const logout = () => {
     setCurrentUser(null);
+    setIsLoginPageView(true);
     localStorage.removeItem(`${STORAGE_KEY}_currentUser`);
   };
 
@@ -988,7 +997,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated: !!currentUser,
         isAuthModalOpen,
         setIsAuthModalOpen,
+        isLoginPageView,
+        setIsLoginPageView,
         login,
+        loginUser,
         quickLoginAsRole,
         logout,
         registerUser,

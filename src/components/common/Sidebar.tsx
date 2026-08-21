@@ -16,6 +16,8 @@ import {
   ChevronRight,
   ShieldCheck,
   Briefcase,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -57,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   setCollapsed,
 }) => {
-  const { currentRole, leads, invoices, expenses } = useApp();
+  const { currentRole, leads, invoices, expenses, currentUser, logout, setIsLoginPageView } = useApp();
 
   const overdueCount = invoices.filter((i) => i.status === 'overdue').length;
   const newLeadsCount = leads.filter((l) => l.status === 'new' || l.status === 'consulting').length;
@@ -275,19 +277,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Footer info box */}
+      {/* Footer info box & Quick Auth Access */}
       {!collapsed && (
-        <div className="p-3 border-t border-slate-100 bg-slate-50 m-2 rounded-xl border">
-          <div className="text-[11px] text-slate-400 flex items-center justify-between mb-1">
-            <span className="font-semibold uppercase tracking-wider text-[10px]">Cơ sở đào tạo</span>
+        <div className="p-2.5 border-t border-slate-100 bg-slate-50 m-2 rounded-xl border space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-400">Cơ sở đào tạo</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
           </div>
           <div className="text-xs text-slate-800 font-bold truncate">
             Cầu Giấy, Hà Nội
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">
-            Dữ liệu đồng bộ Excel 2 chiều
-          </div>
+          
+          <button
+            type="button"
+            onClick={() => setIsLoginPageView(true)}
+            className="w-full mt-1 py-1.5 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <LogIn className="w-3 h-3" />
+            <span>Mở Trang Đăng Nhập</span>
+          </button>
         </div>
       )}
 

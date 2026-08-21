@@ -30,7 +30,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onClose,
   onOpenLoginModal,
 }) => {
-  const { currentUser, logout, changePassword, updateUserProfile } = useApp();
+  const { currentUser, logout, changePassword, updateUserProfile, setIsLoginPageView } = useApp();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
   const [oldPassword, setOldPassword] = useState('');
@@ -257,7 +257,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <div className="pt-2 flex items-center justify-between border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={handleLogout}
+                  onClick={() => {
+                    onClose();
+                    logout();
+                    setIsLoginPageView(true);
+                  }}
                   className="px-3.5 py-2 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -269,11 +273,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     type="button"
                     onClick={() => {
                       onClose();
-                      onOpenLoginModal();
+                      setIsLoginPageView(true);
                     }}
-                    className="px-3.5 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold text-xs transition-colors cursor-pointer"
+                    className="px-3.5 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-bold text-xs transition-colors cursor-pointer"
                   >
-                    Đổi Tài Khoản
+                    Đến Trang Đăng Nhập
                   </button>
                   <button
                     type="submit"
