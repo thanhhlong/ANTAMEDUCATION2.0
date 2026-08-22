@@ -76,35 +76,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const systemNavItems: NavItem[] = [
     {
       id: 'overview',
-      label: 'Dashboard Tổng Quan',
+      label: 'Dashboard Đào Tạo & Học Tập',
       icon: LayoutDashboard,
       roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'ACCOUNTANT'],
     },
     {
       id: 'teacher_workspace',
-      label: 'Bàn Làm Việc & Lịch Dạy',
+      label: 'Bàn Làm Việc Giáo Viên',
       icon: Briefcase,
       highlight: true,
       roles: ['TEACHER'],
     },
     {
+      id: 'timetable',
+      label: 'Thời Khóa Biểu & Lịch Học',
+      icon: CalendarCheck,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'TEACHER', 'TUTOR', 'STUDENT', 'PARENT'],
+    },
+    {
+      id: 'lms',
+      label: 'Học Liệu & Bài Tập (LMS)',
+      icon: BookOpenCheck,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'TUTOR', 'STUDENT'],
+    },
+    {
+      id: 'attendance',
+      label: 'Điểm Danh & Ghi Chú Học',
+      icon: ScanFace,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'TEACHER', 'TUTOR'],
+    },
+    {
+      id: 'students',
+      label: currentRole === 'TEACHER' ? 'Học Sinh Lớp Phụ Trách' : 'Quản Lý Học Sinh',
+      icon: Users,
+      badge: currentRole === 'TEACHER' ? undefined : '58',
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'ACCOUNTANT', 'TEACHER'],
+    },
+    {
+      id: 'tutoring',
+      label: 'Lớp Bồi Dưỡng & Gia Sư',
+      icon: Sparkles,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'TEACHER', 'TUTOR', 'PARENT'],
+    },
+    {
+      id: 'tutors',
+      label: 'Đội Ngũ Thầy Cô & Trợ Giảng',
+      icon: GraduationCap,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'TUTOR'],
+    },
+    {
+      id: 'subjects',
+      label: 'Chương Trình & Môn Học',
+      icon: BookOpen,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER'],
+    },
+    {
+      id: 'parent_portal',
+      label: 'Cổng Tra Cứu Phụ Huynh',
+      icon: HeartHandshake,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'PARENT', 'STUDENT'],
+    },
+  ];
+
+  const academicNavItems: NavItem[] = [
+    {
       id: 'crm',
-      label: 'CRM & Tuyển Sinh',
+      label: 'Tuyển Sinh & CRM',
       icon: UserPlus,
       badge: newLeadsCount > 0 ? `${newLeadsCount} mới` : undefined,
       badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
       roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER'],
     },
     {
-      id: 'students',
-      label: currentRole === 'TEACHER' ? 'Học Sinh Lớp Phụ Trách' : 'Học Sinh & Đăng Ký',
-      icon: Users,
-      badge: currentRole === 'TEACHER' ? undefined : '58',
-      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'ACCOUNTANT', 'TEACHER'],
-    },
-    {
       id: 'finance',
-      label: 'Học Phí & Công Nợ',
+      label: 'Thu Phí & Học Phí',
       icon: CreditCard,
       badge: overdueCount > 0 ? `${overdueCount} nợ` : undefined,
       badgeColor: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -129,52 +174,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Phân Quyền & Tài Khoản',
       icon: ShieldCheck,
       roles: ['SUPER_ADMIN', 'ADMIN'],
-    },
-  ];
-
-  const academicNavItems: NavItem[] = [
-    {
-      id: 'tutoring',
-      label: 'Gia Sư & Bồi Dưỡng',
-      icon: Sparkles,
-      highlight: true,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'TEACHER', 'TUTOR', 'PARENT'],
-    },
-    {
-      id: 'tutors',
-      label: 'Trợ Giảng & Lịch Rảnh',
-      icon: GraduationCap,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'TUTOR'],
-    },
-    {
-      id: 'timetable',
-      label: 'Thời Khóa Biểu',
-      icon: CalendarCheck,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'TEACHER', 'TUTOR', 'STUDENT', 'PARENT'],
-    },
-    {
-      id: 'attendance',
-      label: 'Điểm Danh & Face AI',
-      icon: ScanFace,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'TEACHER', 'TUTOR'],
-    },
-    {
-      id: 'lms',
-      label: 'LMS & Bài Tập',
-      icon: BookOpenCheck,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'TUTOR', 'STUDENT'],
-    },
-    {
-      id: 'parent_portal',
-      label: 'Cổng Phụ Huynh',
-      icon: HeartHandshake,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'PARENT', 'STUDENT'],
-    },
-    {
-      id: 'subjects',
-      label: 'Danh Mục Môn Học',
-      icon: BookOpen,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER'],
     },
   ];
 
@@ -221,12 +220,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         <div className="p-3 flex-1 overflow-y-auto space-y-4">
-          {/* System Group */}
+          {/* System Group (Academic & LMS Core) */}
           {visibleSystem.length > 0 && (
             <div className="space-y-1">
               {(!collapsed || isMobileOpen) && (
-                <div className="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  {currentRole === 'TEACHER' ? 'Bàn Làm Việc Giáo Viên' : 'Quản Trị Hệ Thống'}
+                <div className="px-3 py-1 text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
+                  Đào Tạo & Học Tập
                 </div>
               )}
               {visibleSystem.map((item) => {
@@ -250,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     />
 
                     {(!collapsed || isMobileOpen) && (
-                      <span className="flex-1 truncate tracking-tight text-xs lg:text-sm">
+                      <span className="flex-1 truncate tracking-tight text-xs lg:text-sm font-medium">
                         {item.label}
                       </span>
                     )}
@@ -274,12 +273,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* Academic Group */}
+          {/* Academic Group (Administration & Operations Support) */}
           {visibleAcademic.length > 0 && (
             <div className="space-y-1">
               {(!collapsed || isMobileOpen) && (
                 <div className="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Đào Tạo & Học Tập
+                  Quản Trị & Vận Hành
                 </div>
               )}
               {visibleAcademic.map((item) => {
@@ -307,7 +306,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     />
 
                     {(!collapsed || isMobileOpen) && (
-                      <span className="flex-1 truncate tracking-tight text-xs lg:text-sm">
+                      <span className="flex-1 truncate tracking-tight text-xs lg:text-sm font-medium">
                         {item.label}
                       </span>
                     )}
