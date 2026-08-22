@@ -89,12 +89,15 @@ export const PublicRegistrationForm: React.FC<PublicRegistrationFormProps> = ({
         {!submitted ? (
           <form onSubmit={handleSubmit} className="space-y-4 text-xs lg:text-sm">
             <div className="text-center space-y-1">
-              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold mx-auto border border-indigo-100">
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold mx-auto border border-emerald-200">
                 <GraduationCap className="w-6 h-6" />
               </div>
+              <span className="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase tracking-wider">
+                Tuyển Sinh Chính Thức 2026 - 2027
+              </span>
               <h2 className="text-lg font-bold text-slate-900">Đăng Ký Học Tại AN TÂM EDUCATION</h2>
               <p className="text-xs text-slate-500">
-                Nhận lịch học thử miễn phí & tư vấn lộ trình bồi dưỡng theo năng lực
+                Đăng ký học chương trình chính thức & nhận lộ trình bồi dưỡng theo năng lực
               </p>
             </div>
 

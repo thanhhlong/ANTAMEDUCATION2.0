@@ -67,12 +67,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-bold tracking-tight text-slate-900 text-sm lg:text-base">
                 AN TÂM EDUCATION
               </span>
-              <span className="text-[9px] uppercase font-bold tracking-wider px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                2.0 PRO
+              <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                CHÍNH THỨC 2026 - 2027
               </span>
             </div>
-            <p className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
-              Hệ thống điều hành trung tâm
+            <p className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">
+              Hệ thống đào tạo & điều hành chính thức
             </p>
           </div>
         </div>

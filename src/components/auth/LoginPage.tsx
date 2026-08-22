@@ -84,24 +84,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setSelectedRoleType(role);
     setErrorMessage(null);
     setSuccessMessage(null);
-
-    // Auto-fill convenience credentials based on role
-    if (role === 'SUPER_ADMIN') {
-      setIdentifier('admin');
-      setPassword('123');
-    } else if (role === 'TEACHER') {
-      setIdentifier('gv.nam');
-      setPassword('123');
-    } else if (role === 'ACCOUNTANT') {
-      setIdentifier('accountant');
-      setPassword('123');
-    } else if (role === 'PARENT') {
-      setIdentifier('0903112233');
-      setPassword('123');
-    } else if (role === 'TUTOR') {
-      setIdentifier('tg.minh');
-      setPassword('123');
-    }
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -130,29 +112,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickDemoLogin = (username: string, pass: string, role: UserRole) => {
-    setIdentifier(username);
-    setPassword(pass);
-    setSelectedRoleType(role);
-    setErrorMessage(null);
-    setIsLoading(true);
-
-    setTimeout(async () => {
-      const res = await loginUser(username, pass);
-      setIsLoading(false);
-      if (res.success) {
-        confetti({
-          particleCount: 60,
-          spread: 60,
-          origin: { y: 0.6 },
-        });
-        if (onLoginSuccess) onLoginSuccess();
-      } else {
-        setErrorMessage(res.message || 'Đăng nhập thất bại');
-      }
-    }, 200);
   };
 
   const handleParentLookup = (e: React.FormEvent) => {
@@ -434,19 +393,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
+                      <div className="mb-1.5">
                         <label className="font-bold text-slate-700">Mật khẩu bảo mật</label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIdentifier('admin');
-                            setPassword('123');
-                            setSuccessMessage('Đã điền mật khẩu mặc định (123)');
-                          }}
-                          className="text-[11px] text-emerald-700 font-bold hover:underline cursor-pointer"
-                        >
-                          Mặc định: 123
-                        </button>
                       </div>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -480,10 +428,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         />
                         <span>Ghi nhớ phiên làm việc</span>
                       </label>
-
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        Mật khẩu demo: <strong className="text-emerald-800">123</strong>
-                      </span>
                     </div>
 
                     <button
@@ -501,84 +445,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       )}
                     </button>
                   </form>
-
-                  {/* 1-Click Quick Demo Accounts */}
-                  <div className="pt-3 border-t border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-600" />
-                        <span>Tài khoản mẫu thử nghiệm tức thì (1-Click):</span>
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickDemoLogin('admin', '123', 'SUPER_ADMIN')}
-                        className="p-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 text-left transition-all cursor-pointer group"
-                      >
-                        <div className="text-[11px] font-bold text-emerald-900 group-hover:text-emerald-700 truncate">
-                          Quản Trị Viên
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono">admin / 123</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickDemoLogin('gv.nam', '123', 'TEACHER')}
-                        className="p-2.5 rounded-xl bg-slate-50 hover:bg-teal-50/60 border border-slate-200 hover:border-teal-300 text-left transition-all cursor-pointer group"
-                      >
-                        <div className="text-[11px] font-bold text-teal-900 group-hover:text-teal-700 truncate">
-                          Thầy Nam (Toán)
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono">gv.nam / 123</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickDemoLogin('gv.trang', '123', 'TEACHER')}
-                        className="p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 text-left transition-all cursor-pointer group"
-                      >
-                        <div className="text-[11px] font-bold text-indigo-900 group-hover:text-indigo-700 truncate">
-                          Cô Trang (Anh)
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono">gv.trang / 123</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickDemoLogin('accountant', '123', 'ACCOUNTANT')}
-                        className="p-2.5 rounded-xl bg-slate-50 hover:bg-amber-50/60 border border-slate-200 hover:border-amber-300 text-left transition-all cursor-pointer group"
-                      >
-                        <div className="text-[11px] font-bold text-amber-900 group-hover:text-amber-700 truncate">
-                          Kế Toán Trưởng
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono">accountant / 123</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickDemoLogin('0903112233', '123', 'PARENT')}
-                        className="p-2.5 rounded-xl bg-slate-50 hover:bg-purple-50/60 border border-slate-200 hover:border-purple-300 text-left transition-all cursor-pointer group"
-                      >
-                        <div className="text-[11px] font-bold text-purple-900 group-hover:text-purple-700 truncate">
-                          PH Em Gia Bảo
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono">0903112233 / 123</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleQuickDemoLogin('tg.minh', '123', 'TUTOR')}
-                        className="p-2.5 rounded-xl bg-slate-50 hover:bg-rose-50/60 border border-slate-200 hover:border-rose-300 text-left transition-all cursor-pointer group"
-                      >
-                        <div className="text-[11px] font-bold text-rose-900 group-hover:text-rose-700 truncate">
-                          Trợ Giảng Minh
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono">tg.minh / 123</div>
-                      </button>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -658,7 +524,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => handleQuickDemoLogin(lookupResult.parentPhone, '123', 'PARENT')}
+                        onClick={async () => {
+                          setIsLoading(true);
+                          const res = await loginUser(lookupResult.parentPhone, '123');
+                          setIsLoading(false);
+                          if (res.success) {
+                            confetti({
+                              particleCount: 60,
+                              spread: 60,
+                              origin: { y: 0.6 },
+                            });
+                            if (onLoginSuccess) onLoginSuccess();
+                          }
+                        }}
                         className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                       >
                         <HeartHandshake className="w-4 h-4" />
@@ -666,17 +544,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </button>
                     </div>
                   )}
-
-                  <div className="pt-2 text-center text-xs text-slate-500">
-                    <span>Gợi ý SĐT thử nghiệm: </span>
-                    <button
-                      type="button"
-                      onClick={() => setLookupPhoneOrCode('0903112233')}
-                      className="text-indigo-700 font-bold hover:underline font-mono cursor-pointer"
-                    >
-                      0903112233 (Nguyễn Gia Bảo)
-                    </button>
-                  </div>
                 </div>
               )}
 

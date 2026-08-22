@@ -78,24 +78,52 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto text-slate-800">
+      {/* Official Program Notification Bar */}
+      <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-2.5 w-2.5 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
+          </span>
+          <div>
+            <strong className="text-emerald-950 font-bold">Chương Trình Đào Tạo Chính Thức 2026 - 2027</strong>
+            <span className="text-emerald-700 ml-2 hidden sm:inline">• Khối 6, 7, 8, 9 với 5 trụ cột môn học & 3 ca học chuẩn</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => onNavigate('timetable')}
+            className="px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold hover:bg-emerald-100/60 transition-colors cursor-pointer shadow-2xs"
+          >
+            Xem TKB Chuẩn
+          </button>
+          <button
+            onClick={() => onNavigate('subjects')}
+            className="px-2.5 py-1 rounded-lg bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors cursor-pointer shadow-2xs"
+          >
+            Xem Khung Môn Học
+          </button>
+        </div>
+      </div>
+
       {/* Header with Quick Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-            <span>Học Viện An Tâm</span>
+            <span>An Tâm Education</span>
             <span>/</span>
-            <span className="text-slate-700 font-medium">Bảng Điều Hành Đào Tạo & Học Tập</span>
+            <span className="text-slate-700 font-medium">Bảng Điều Hành Đào Tạo Chính Thức</span>
           </div>
-          <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2 mt-1">
-            <span>ANTAM EDUCATION – QUẢN LÝ ĐÀO TẠO</span>
+          <h1 className="text-xl lg:text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2 mt-1">
+            <span>ANTAM EDUCATION – VẬN HÀNH CHÍNH THỨC</span>
             {selectedGrade !== 'all' && (
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
-                Đang lọc: Khối {selectedGrade}
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+                Khối {selectedGrade}
               </span>
             )}
           </h1>
           <p className="text-xs lg:text-sm text-slate-500 mt-0.5">
-            Giám sát chất lượng giảng dạy, tỷ lệ chuyên cần, tiến độ bài tập LMS & hỗ trợ học viên kịp thời.
+            Giám sát chất lượng giảng dạy chuẩn, tỷ lệ chuyên cần, sổ điểm danh & tiến độ bồi dưỡng học viên.
           </p>
         </div>
 
