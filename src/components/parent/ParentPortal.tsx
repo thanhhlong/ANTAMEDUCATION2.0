@@ -8,6 +8,9 @@ import {
   Award,
   CreditCard,
   BookOpen,
+  Calendar,
+  Clock,
+  Building,
 } from 'lucide-react';
 
 interface ParentPortalProps {
@@ -18,7 +21,7 @@ interface ParentPortalProps {
 export const ParentPortal: React.FC<ParentPortalProps> = ({
   onOpenPaymentModal,
 }) => {
-  const { students, invoices } = useApp();
+  const { students, invoices, scheduleSessions } = useApp();
 
   const [searchPhoneOrCode, setSearchPhoneOrCode] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(students[0] || null);
@@ -44,6 +47,11 @@ export const ParentPortal: React.FC<ParentPortalProps> = ({
   const studentInvoice = selectedStudent
     ? invoices.find((i) => i.studentId === selectedStudent.id)
     : null;
+
+  // Student's weekly schedule based on their grade & classes
+  const studentSessions = selectedStudent
+    ? scheduleSessions.filter((s) => s.grade === selectedStudent.grade)
+    : [];
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto text-slate-800">
@@ -222,6 +230,48 @@ export const ParentPortal: React.FC<ParentPortalProps> = ({
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Student's Weekly Timetable */}
+          <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-emerald-600" />
+                <span>Thời Khóa Biểu Học Tập Trong Tuần (Khối {selectedStudent.grade})</span>
+              </h3>
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                {studentSessions.length} Buổi học / tuần
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {studentSessions.map((ses) => (
+                <div
+                  key={ses.id}
+                  className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2 hover:border-slate-300 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold px-2 py-0.5 rounded bg-white text-slate-800 border border-slate-200 shadow-2xs">
+                      Thứ {ses.dayOfWeek} • Ca {ses.shift}
+                    </span>
+                    <span className="font-mono text-slate-600 font-semibold flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-slate-400" />
+                      {ses.startTime} - {ses.endTime}
+                    </span>
+                  </div>
+
+                  <div className="font-bold text-slate-900 text-sm">{ses.className}</div>
+
+                  <div className="text-slate-600 space-y-0.5 text-[11px]">
+                    <div>Phòng: <strong className="text-slate-800">{ses.room}</strong></div>
+                    <div>GV: <strong className="text-slate-800">{ses.teacherName}</strong></div>
+                    {ses.tutorName && (
+                      <div className="text-indigo-700 font-medium">Trợ giảng: {ses.tutorName}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

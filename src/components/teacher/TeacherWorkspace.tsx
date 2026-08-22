@@ -61,13 +61,12 @@ export const TeacherWorkspace: React.FC<TeacherWorkspaceProps> = ({
   // Filter sessions taught by this teacher or in teacher's classes
   const teacherSessions = scheduleSessions.filter(
     (s) =>
-      s.teacher.toLowerCase().includes(teacherName.toLowerCase().replace('thầy ', '').replace('cô ', '')) ||
-      teacherClasses.includes(s.className)
+      (s.teacherName || '').toLowerCase().includes(teacherName.toLowerCase().replace('thầy ', '').replace('cô ', '')) ||
+      teacherClasses.some((tc) => (s.className || '').includes(tc))
   );
 
-  // Today's sessions
-  const todayName = 'Thứ 4'; // Mock active current day
-  const todaySessions = teacherSessions.filter((s) => s.dayOfWeek === todayName || s.dayOfWeek === 'Thứ 2');
+  // Today's sessions (default to active sessions or first few)
+  const todaySessions = teacherSessions.length > 0 ? teacherSessions.slice(0, 3) : scheduleSessions.slice(0, 3);
 
   // Filter students belonging to teacher's classes
   const myStudents = students.filter(
@@ -249,46 +248,36 @@ export const TeacherWorkspace: React.FC<TeacherWorkspaceProps> = ({
 
             <div className="p-4 space-y-3">
               {teacherSessions.slice(0, 4).map((session) => {
-                const isToday = session.dayOfWeek === todayName || session.dayOfWeek === 'Thứ 2';
+                const dayLabel = session.dayOfWeek ? `Thứ ${session.dayOfWeek}` : 'Hôm nay';
                 return (
                   <div
                     key={session.id}
-                    className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                      isToday
-                        ? 'bg-emerald-50/40 border-emerald-200 shadow-2xs'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
+                    className="p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border-slate-200 hover:border-slate-300"
                   >
                     <div className="flex items-start gap-3.5">
-                      <div
-                        className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center font-bold shrink-0 ${
-                          isToday
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        <span className="text-[10px] leading-none uppercase">{session.dayOfWeek}</span>
-                        <span className="text-xs font-black mt-0.5">{session.className}</span>
+                      <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center font-bold shrink-0 bg-emerald-700 text-white shadow-2xs">
+                        <span className="text-[10px] leading-none uppercase">{dayLabel}</span>
+                        <span className="text-[11px] font-black mt-0.5">Ca {session.shift || 1}</span>
                       </div>
 
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-900">
-                            {session.subjectName}
+                            {session.className}
                           </span>
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                            Phòng: {session.room}
+                            {session.room}
                           </span>
                         </div>
                         <div className="text-xs text-slate-600 flex items-center gap-2">
-                          <span className="font-mono">{session.timeSlot}</span>
+                          <span className="font-mono">{session.startTime} - {session.endTime}</span>
                           <span>•</span>
-                          <span>{session.studentCount} Học sinh</span>
-                          {session.tutorAssistant && (
+                          <span>Khối {session.grade}</span>
+                          {session.tutorName && (
                             <>
                               <span>•</span>
-                              <span className="text-purple-700 font-medium">
-                                Trợ giảng: {session.tutorAssistant}
+                              <span className="text-indigo-700 font-medium">
+                                Trợ giảng: {session.tutorName}
                               </span>
                             </>
                           )}
@@ -299,14 +288,10 @@ export const TeacherWorkspace: React.FC<TeacherWorkspaceProps> = ({
                     <div className="flex items-center gap-2 self-end sm:self-center">
                       <button
                         onClick={() => onNavigateToAttendance(session.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors ${
-                          isToday
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
-                        }`}
+                        className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                       >
                         <UserCheck className="w-3.5 h-3.5" />
-                        <span>{isToday ? 'Điểm Danh Ngay' : 'Sổ Điểm Danh'}</span>
+                        <span>Điểm Danh Ca Này</span>
                       </button>
                     </div>
                   </div>

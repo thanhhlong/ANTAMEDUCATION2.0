@@ -122,7 +122,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'antam_education_app_state_v2';
+const STORAGE_KEY = 'antam_education_app_state_v3';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<AuthUser[]>(() => {
