@@ -127,6 +127,26 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Actions & User Auth */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <a
+            href="/antam-education-hosting.zip"
+            download="antam-education-hosting.zip"
+            className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-500 transition-colors cursor-pointer whitespace-nowrap shadow-2xs text-xs"
+            title="Tải gói đóng gói chuẩn sẵn sàng upload thẳng lên Hosting (cPanel, Viettel IDC, DirectAdmin)"
+          >
+            <Download className="w-3.5 h-3.5 text-white shrink-0" />
+            <span>Tải Gói Hosting (ZIP)</span>
+          </a>
+
+          <a
+            href="/antam-education-full.zip"
+            download="antam-education-full.zip"
+            className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition-colors cursor-pointer whitespace-nowrap shadow-2xs text-xs"
+            title="Tải toàn bộ mã nguồn & bản dựng offline để chạy trực tiếp trên máy tính"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-950 shrink-0" />
+            <span>Bản Offline Máy Tính</span>
+          </a>
+
           <button
             onClick={onOpenPublicForm}
             className="hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer whitespace-nowrap shadow-2xs"

@@ -1,0 +1,57 @@
+=======================================================================
+     HƯỚNG DẪN CÀI ĐẶT & CHẠY HỆ THỐNG AN TÂM EDUCATION LOCALLY
+=======================================================================
+
+Chào mừng bạn đến với Bản cài đặt chạy trực tiếp (Offline / Local) của Hệ thống quản lý đào tạo AN TÂM EDUCATION. 
+
+Với bản đóng gói này, bạn có thể chạy toàn bộ hệ thống ngay trên máy tính cá nhân của mình một cách mượt mà và bảo mật nhất.
+
+-----------------------------------------------------------------------
+A. YÊU CẦU HỆ THỐNG (Yêu cầu duy nhất)
+-----------------------------------------------------------------------
+Máy tính của bạn cần cài đặt Node.js để chạy máy chủ nội bộ phục vụ hệ thống.
+1. Tải bản cài đặt Node.js chính thức tại: https://nodejs.org/ (Chọn phiên bản LTS tải về).
+2. Nhấp đúp vào file vừa tải và bấm Next liên tục để hoàn tất cài đặt.
+
+-----------------------------------------------------------------------
+B. CÁCH KHỞI CHẠY TRỰC TIẾP (Cực kỳ đơn giản)
+-----------------------------------------------------------------------
+
+👉 TRÊN HỆ ĐIỀU HÀNH WINDOWS:
+   1. Giải nén toàn bộ thư mục file .zip này ra máy tính.
+   2. Nhấp đúp chuột vào file "chay_he_thong.bat".
+   3. Hệ thống sẽ tự động cài đặt thư viện cần thiết trong lần đầu tiên, khởi động server nội bộ và mở trình duyệt web địa chỉ http://localhost:3000 để bạn sử dụng ngay lập tức!
+
+👉 TRÊN HỆ ĐIỀU HÀNH macOS / LINUX:
+   1. Giải nén file .zip ra thư mục của bạn.
+   2. Mở ứng dụng Terminal.
+   3. Di chuyển đến thư mục vừa giải nén (ví dụ: cd ~/Downloads/antam-education).
+   4. Cấp quyền thực thi cho file chạy bằng lệnh: 
+      chmod +x chay_he_thong.sh
+   5. Chạy file bằng lệnh: 
+      ./chay_he_thong.sh
+
+-----------------------------------------------------------------------
+C. CẤU HÌNH TÍNH NĂNG AI (GEMINI) - Tùy chọn
+-----------------------------------------------------------------------
+Hệ thống tích hợp sẵn các trợ lý AI thông minh (Gia sư AI, Tạo câu hỏi tự động, Phân tích tài chính thông minh). Để các tính năng AI này hoạt động trên máy cá nhân của bạn:
+
+1. Mở file có tên ".env" bằng công cụ ghi chú (Notepad, TextEdit...).
+2. Đăng ký một mã khóa API Gemini miễn phí tại: https://aistudio.google.com/
+3. Điền mã khóa của bạn vào dòng sau:
+   GEMINI_API_KEY=mã_khóa_của_bạn_ở_đây
+4. Lưu file lại và khởi động lại chương trình.
+
+-----------------------------------------------------------------------
+D. THƯ MỤC CHƯƠNG TRÌNH BAO GỒM
+-----------------------------------------------------------------------
+- \dist            : Thư mục chứa mã nguồn tĩnh đã được biên dịch tối ưu (HTML/CSS/JS).
+- \src             : Toàn bộ mã nguồn phát triển (React + TypeScript).
+- package.json     : Tệp cấu hình thư viện hệ thống.
+- server.ts        : Máy chủ Backend Express.js nội bộ phục vụ routing và tích hợp API.
+- chay_he_thong.*  : Các tệp thực thi khởi chạy tự động nhanh chỉ với 1 click.
+
+=======================================================================
+Mọi thắc mắc và hỗ trợ kỹ thuật, xin chân thành cảm ơn bạn đã lựa chọn sử dụng 
+Hệ thống Điều hành & Đào tạo chất lượng cao AN TÂM EDUCATION!
+=======================================================================

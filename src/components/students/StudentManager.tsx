@@ -19,6 +19,8 @@ import {
   FileSpreadsheet,
   Download,
   AlertTriangle,
+  RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -106,9 +108,26 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
     return true;
   });
 
+  const generateNextStudentCode = (gradeNum: number) => {
+    const gradeStudents = students.filter((s) => s.grade === gradeNum);
+    let maxSeq = 0;
+    const prefix = `AT-K${gradeNum}-`;
+    gradeStudents.forEach((s) => {
+      if (s.code && s.code.startsWith(prefix)) {
+        const parts = s.code.substring(prefix.length);
+        const seq = parseInt(parts, 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    });
+    const nextSeq = maxSeq > 0 ? maxSeq + 1 : gradeStudents.length + 1;
+    return `${prefix}${String(nextSeq).padStart(3, '0')}`;
+  };
+
   const handleOpenAdd = () => {
     const nextGrade = selectedGrade === 'all' ? 8 : selectedGrade;
-    const defaultCode = `AT-K${nextGrade}-${String(students.length + 1).padStart(3, '0')}`;
+    const defaultCode = generateNextStudentCode(nextGrade);
     setFormData({
       code: defaultCode,
       fullName: '',
@@ -594,14 +613,42 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
               {/* Row 1: Code & Full Name */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-slate-600 font-medium mb-1">Mã Học Sinh</label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  />
+                  <label className="block text-slate-600 font-medium mb-1 flex items-center justify-between">
+                    <span>Mã Học Sinh *</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextCode = generateNextStudentCode(formData.grade);
+                        setFormData({ ...formData, code: nextCode });
+                        confetti({ particleCount: 30, spread: 40, origin: { y: 0.6 } });
+                      }}
+                      className="text-[10px] text-indigo-600 font-bold hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Tự động tạo mã học sinh mới theo khối lớp hiện tại"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-500" />
+                      <span>Tự tạo mã</span>
+                    </button>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.code}
+                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                      required
+                      className="w-full pl-3 pr-10 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 font-mono font-semibold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextCode = generateNextStudentCode(formData.grade);
+                        setFormData({ ...formData, code: nextCode });
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
+                      title="Làm mới mã"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="sm:col-span-2">
@@ -624,8 +671,17 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                   <label className="block text-slate-600 font-medium mb-1">Khối Lớp</label>
                   <select
                     value={formData.grade}
-                    onChange={(e) => setFormData({ ...formData, grade: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500"
+                    onChange={(e) => {
+                      const newGrade = Number(e.target.value);
+                      const nextCode = !editingStudent ? generateNextStudentCode(newGrade) : formData.code;
+                      setFormData({
+                        ...formData,
+                        grade: newGrade,
+                        className: `${newGrade}A1`,
+                        code: nextCode,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500 cursor-pointer font-semibold"
                   >
                     {[6, 7, 8, 9, 10, 11, 12].map((g) => (
                       <option key={g} value={g}>

@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Send,
   Plus,
+  Download,
 } from 'lucide-react';
 import { ActiveTab } from '../common/Sidebar';
 
@@ -91,6 +92,24 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <a
+            href="/antam-education-hosting.zip"
+            download="antam-education-hosting.zip"
+            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1"
+            title="Tải gói đóng gói chuẩn sẵn sàng upload thẳng lên Hosting (cPanel, Viettel IDC, DirectAdmin)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Tải Gói Hosting (ZIP)</span>
+          </a>
+          <a
+            href="/antam-education-full.zip"
+            download="antam-education-full.zip"
+            className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1"
+            title="Tải toàn bộ mã nguồn & bản dựng offline để chạy trực tiếp trên máy tính"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Bản Offline</span>
+          </a>
           <button
             onClick={() => onNavigate('timetable')}
             className="px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold hover:bg-emerald-100/60 transition-colors cursor-pointer shadow-2xs"

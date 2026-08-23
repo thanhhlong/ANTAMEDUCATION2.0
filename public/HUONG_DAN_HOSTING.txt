@@ -1,0 +1,39 @@
+=======================================================================
+   HƯỚNG DẪN ĐƯA WEBSITE AN TÂM EDUCATION LÊN WEB HOSTING (VIETTEL, CPANEL, DIRECTADMIN)
+=======================================================================
+
+Gói nén "antam-education-hosting.zip" là bản đóng gói CHUẨN ĐỂ UPLOAD TRỰC TIẾP lên Web Hosting (cPanel, DirectAdmin, Plesk, Viettel IDC...).
+
+Tất cả các file trong gói này đã được biên dịch tối ưu (HTML, CSS, Javascript, Icon, Fonts) kèm theo file cấu hình điều hướng .htaccess chống lỗi 404 khi tải lại trang.
+
+-----------------------------------------------------------------------
+CÁC BƯỚC THỰC HIỆN TRÊN BẢNG ĐIỀU KHIỂN HOSTING (cPanel / DirectAdmin):
+-----------------------------------------------------------------------
+
+Bước 1: Đăng nhập vào trang quản trị Hosting của bạn.
+Bước 2: Tìm và mở mục "File Manager" (Trình quản lý tệp).
+Bước 3: Mở thư mục "public_html" (hoặc thư mục gốc của tên miền bạn muốn chạy).
+Bước 4: Nhấn nút "Upload" (Tải lên) và chọn file "antam-education-hosting.zip".
+Bước 5: Sau khi tải lên hoàn tất, nhấp chuột phải vào file "antam-education-hosting.zip" và chọn "Extract" (Giải nén).
+        * Lưu ý: Đảm bảo các file như index.html, .htaccess và thư mục assets/ nằm trực tiếp trong public_html.
+Bước 6: Mở trình duyệt và truy cập tên miền của bạn (ví dụ: https://antameducation.vn). Website đã sẵn sàng hoạt động 100%!
+
+-----------------------------------------------------------------------
+CẤU HÌNH CHO MÁY CHỦ NGINX / VPS (NẾU DÙNG VPS RIÊNG):
+-----------------------------------------------------------------------
+Nếu bạn sử dụng VPS chạy Nginx, hãy thêm cấu hình sau vào khối server block:
+
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+    root /var/www/antam-education;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+=======================================================================
+Chúc bạn triển khai thành công hệ thống An Tâm Education!
+=======================================================================
