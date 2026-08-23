@@ -19,6 +19,7 @@ import { SubjectManager } from './components/subjects/SubjectManager';
 import { TeacherPayroll } from './components/finance/TeacherPayroll';
 import { PaymentModal } from './components/finance/PaymentModal';
 import { ExcelImportModal } from './components/excel/ExcelModals';
+import { DataCleanerModal } from './components/common/DataCleanerModal';
 import { PublicRegistrationForm } from './components/public/PublicRegistrationForm';
 import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileModal } from './components/auth/UserProfileModal';
@@ -65,6 +66,7 @@ const MainAppContent: React.FC = () => {
   // Modals state
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDataCleanerOpen, setIsDataCleanerOpen] = useState(false);
   const [isPublicFormOpen, setIsPublicFormOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [targetTutoringLeadId, setTargetTutoringLeadId] = useState<string | undefined>(undefined);
@@ -110,6 +112,7 @@ const MainAppContent: React.FC = () => {
         onOpenExport={handleExportExcel}
         onDownloadTemplate={handleDownloadTemplate}
         onOpenPublicForm={() => setIsPublicFormOpen(true)}
+        onOpenDataCleaner={() => setIsDataCleanerOpen(true)}
         onOpenLogin={() => setIsLoginPageView(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onToggleSidebar={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -212,6 +215,13 @@ const MainAppContent: React.FC = () => {
         <ExcelImportModal
           isOpen={isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}
+        />
+      )}
+
+      {isDataCleanerOpen && (
+        <DataCleanerModal
+          isOpen={isDataCleanerOpen}
+          onClose={() => setIsDataCleanerOpen(false)}
         />
       )}
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ParentLead, LeadStatus } from '../../types';
+import { ExcelImportModal } from '../excel/ExcelModals';
 import {
   UserPlus,
   Search,
@@ -10,6 +11,7 @@ import {
   UserCheck,
   X,
   History,
+  Upload,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -29,6 +31,7 @@ export const CrmManager: React.FC<CrmManagerProps> = ({ onNavigateToTutoring }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<ParentLead | null>(null);
 
   // Add lead form state
@@ -154,13 +157,23 @@ export const CrmManager: React.FC<CrmManagerProps> = ({ onNavigateToTutoring }) 
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs lg:text-sm font-semibold shadow-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Thêm Lead Phụ Huynh</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs lg:text-sm font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Upload className="w-4 h-4 text-amber-600" />
+            <span>Nhập CRM Từ Excel (BM2)</span>
+          </button>
+
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs lg:text-sm font-semibold shadow-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Thêm Lead Phụ Huynh</span>
+          </button>
+        </div>
       </div>
 
       {/* Pipeline Stats */}
@@ -547,6 +560,12 @@ export const CrmManager: React.FC<CrmManagerProps> = ({ onNavigateToTutoring }) 
           </div>
         </div>
       )}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
     </div>
   );
 };

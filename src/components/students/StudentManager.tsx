@@ -4,6 +4,7 @@ import { Student } from '../../types';
 import { formatCurrency, formatShortCurrency } from '../../utils/formatters';
 import { exportTuitionStudentsExcel } from '../../utils/excelParser';
 import { TuitionExportModal } from '../finance/TuitionExportModal';
+import { ExcelImportModal } from '../excel/ExcelModals';
 import {
   Users,
   Search,
@@ -18,9 +19,11 @@ import {
   CreditCard,
   FileSpreadsheet,
   Download,
+  Upload,
   AlertTriangle,
   RefreshCw,
   Sparkles,
+  TableProperties,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -38,6 +41,8 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
     addStudent,
     updateStudent,
     deleteStudent,
+    isCompactView,
+    setIsCompactView,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +52,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
   // Export Modal state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportInitialType, setExportInitialType] = useState<'all' | 'paid' | 'debt'>('all');
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -285,6 +291,14 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
 
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs lg:text-sm font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Upload className="w-4 h-4 text-indigo-600" />
+            <span>Nhập Từ Excel</span>
+          </button>
+
+          <button
             onClick={() => {
               setExportInitialType('all');
               setIsExportModalOpen(true);
@@ -384,10 +398,10 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
           </div>
         </div>
 
-        {/* Row 2: Search & Dropdown Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {/* Row 2: Search & Dropdown Filters & Compact View */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
           {/* Search Box */}
-          <div className="relative sm:col-span-2">
+          <div className="relative sm:col-span-5">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -399,7 +413,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
           </div>
 
           {/* Subject Filter */}
-          <div>
+          <div className="sm:col-span-3">
             <select
               value={selectedSubjectFilter}
               onChange={(e) => setSelectedSubjectFilter(e.target.value)}
@@ -415,16 +429,32 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
           </div>
 
           {/* Payment Status Filter */}
-          <div>
+          <div className="sm:col-span-2">
             <select
               value={paymentFilter}
               onChange={(e) => setPaymentFilter(e.target.value as any)}
               className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs lg:text-sm text-slate-800 focus:outline-none focus:border-indigo-500"
             >
-              <option value="all">Tất cả trạng thái học phí</option>
-              <option value="paid">Đã nộp đủ (0đ nợ)</option>
-              <option value="debt">Còn nợ / Đóng thiếu</option>
+              <option value="all">Tất cả học phí</option>
+              <option value="paid">Đã nộp đủ</option>
+              <option value="debt">Còn nợ</option>
             </select>
+          </div>
+
+          {/* Compact View Toggle */}
+          <div className="sm:col-span-2 flex justify-end">
+            <button
+              onClick={() => setIsCompactView(!isCompactView)}
+              title={isCompactView ? 'Chuyển sang chế độ xem tiêu chuẩn' : 'Chuyển sang chế độ xem thu gọn tiết kiệm diện tích'}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer whitespace-nowrap ${
+                isCompactView
+                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
+              }`}
+            >
+              <TableProperties className="w-3.5 h-3.5" />
+              <span>{isCompactView ? 'Xem Gọn: BẬT' : 'Xem Gọn'}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -435,13 +465,13 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
           <table className="w-full text-left text-xs lg:text-sm text-slate-700">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3.5">Học Sinh</th>
-                <th className="px-3 py-3.5">Khối / Lớp</th>
-                <th className="px-4 py-3.5">Môn Đăng Ký</th>
-                <th className="px-3 py-3.5">Học Phí / Tháng</th>
-                <th className="px-3 py-3.5">Công Nợ</th>
-                <th className="px-4 py-3.5">Phụ Huynh & SĐT</th>
-                <th className="px-4 py-3.5 text-right">Thao Tác</th>
+                <th className={isCompactView ? 'px-3 py-2 font-bold' : 'px-4 py-3.5 font-bold'}>Học Sinh</th>
+                <th className={isCompactView ? 'px-2 py-2 font-bold' : 'px-3 py-3.5 font-bold'}>Khối / Lớp</th>
+                <th className={isCompactView ? 'px-3 py-2 font-bold' : 'px-4 py-3.5 font-bold'}>Môn Đăng Ký</th>
+                <th className={isCompactView ? 'px-2 py-2 font-bold' : 'px-3 py-3.5 font-bold'}>Học Phí</th>
+                <th className={isCompactView ? 'px-2 py-2 font-bold' : 'px-3 py-3.5 font-bold'}>Công Nợ</th>
+                <th className={isCompactView ? 'px-3 py-2 font-bold' : 'px-4 py-3.5 font-bold'}>Phụ Huynh & SĐT</th>
+                <th className={isCompactView ? 'px-3 py-2 font-bold text-right' : 'px-4 py-3.5 font-bold text-right'}>Thao Tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -457,41 +487,45 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                   return (
                     <tr key={student.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* Name & Code */}
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-2xs">
+                      <td className={isCompactView ? 'px-3 py-1.5' : 'px-4 py-3.5'}>
+                        <div className="flex items-center gap-2.5">
+                          <div className={`rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 shadow-2xs ${isCompactView ? 'w-7 h-7 text-[10px]' : 'w-9 h-9 text-xs'}`}>
                             {student.fullName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'HS'}
                           </div>
                           <div>
-                            <div className="font-bold text-slate-900 flex items-center gap-2">
-                              <span>{student.fullName}</span>
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className={isCompactView ? 'text-xs' : 'text-sm'}>{student.fullName}</span>
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                 {student.gender}
                               </span>
                             </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
                               <span className="font-mono text-indigo-600 font-semibold">{student.code}</span>
-                              <span>•</span>
-                              <span className="truncate max-w-[140px]">{student.currentSchool}</span>
+                              {student.currentSchool && (
+                                <>
+                                  <span>•</span>
+                                  <span className="truncate max-w-[140px]">{student.currentSchool}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
                       </td>
 
                       {/* Grade & Class */}
-                      <td className="px-3 py-3.5">
-                        <div className="font-semibold text-slate-900">Khối {student.grade}</div>
-                        <div className="text-[11px] text-indigo-600 font-medium">Lớp {student.className}</div>
+                      <td className={isCompactView ? 'px-2 py-1.5' : 'px-3 py-3.5'}>
+                        <div className="font-semibold text-slate-900 text-xs">Khối {student.grade}</div>
+                        <div className="text-[10px] text-indigo-600 font-medium">Lớp {student.className}</div>
                       </td>
 
                       {/* Enrolled Subjects */}
-                      <td className="px-4 py-3.5">
+                      <td className={isCompactView ? 'px-3 py-1.5' : 'px-4 py-3.5'}>
                         <div className="flex flex-wrap gap-1 max-w-xs">
                           {student.enrollments.map((en) => {
                             return (
                               <span
                                 key={en.id}
-                                className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap"
                               >
                                 {en.subjectName}
                               </span>
@@ -501,10 +535,10 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                       </td>
 
                       {/* Tuition Fee */}
-                      <td className="px-3 py-3.5 whitespace-nowrap">
+                      <td className={`whitespace-nowrap ${isCompactView ? 'px-2 py-1.5 text-xs' : 'px-3 py-3.5'}`}>
                         {student.tuitionWaived ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
-                            Miễn học phí 100%
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
+                            Miễn 100%
                           </span>
                         ) : (
                           <span className="font-bold text-slate-900">{formatCurrency(student.totalTuitionDue)}</span>
@@ -512,7 +546,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                       </td>
 
                       {/* Debt */}
-                      <td className="px-3 py-3.5 whitespace-nowrap">
+                      <td className={`whitespace-nowrap ${isCompactView ? 'px-2 py-1.5 text-xs' : 'px-3 py-3.5'}`}>
                         {student.tuitionWaived ? (
                           <span className="text-slate-400 text-xs font-medium">—</span>
                         ) : student.remainingDebt > 0 ? (
@@ -522,35 +556,35 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                             </span>
                             <button
                               onClick={() => targetInv && onOpenPaymentModal(targetInv.id)}
-                              className="px-2 py-0.5 text-[10px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors font-bold cursor-pointer"
+                              className="px-1.5 py-0.5 text-[9px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors font-bold cursor-pointer"
                             >
-                              Thu tiền
+                              Thu
                             </button>
                           </div>
                         ) : (
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Đã thu đủ</span>
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-600">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Đã đủ</span>
                           </span>
                         )}
                       </td>
 
                       {/* Parent info */}
-                      <td className="px-4 py-3.5">
-                        <div className="text-slate-800 font-medium">{student.parentName}</div>
-                        <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3 text-slate-400" />
+                      <td className={isCompactView ? 'px-3 py-1.5' : 'px-4 py-3.5'}>
+                        <div className="text-slate-800 font-medium text-xs">{student.parentName}</div>
+                        <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                          <Phone className="w-2.5 h-2.5 text-slate-400" />
                           <span>{student.parentPhone}</span>
                         </div>
                       </td>
 
                       {/* Actions */}
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className={`text-right ${isCompactView ? 'px-3 py-1.5' : 'px-4 py-3.5'}`}>
+                        <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingStudent(student)}
                             title="Xem hồ sơ chi tiết"
-                            className="p-1.5 rounded-md bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                            className="p-1 rounded-md bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
@@ -558,7 +592,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                           <button
                             onClick={() => handleOpenEdit(student)}
                             title="Chỉnh sửa thông tin"
-                            className="p-1.5 rounded-md bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                            className="p-1 rounded-md bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition-colors cursor-pointer"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -570,7 +604,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                               }
                             }}
                             title="Xóa học sinh"
-                            className="p-1.5 rounded-md bg-slate-100 text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                            className="p-1 rounded-md bg-slate-100 text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1062,6 +1096,12 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         initialType={exportInitialType}
+      />
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
       />
     </div>
   );

@@ -22,6 +22,7 @@ interface NavbarProps {
   onOpenExport: () => void;
   onDownloadTemplate: () => void;
   onOpenPublicForm: () => void;
+  onOpenDataCleaner: () => void;
   onOpenLogin: () => void;
   onOpenProfile: () => void;
   onToggleSidebar: () => void;
@@ -32,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenExport,
   onDownloadTemplate,
   onOpenPublicForm,
+  onOpenDataCleaner,
   onOpenLogin,
   onOpenProfile,
   onToggleSidebar,
@@ -161,6 +163,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span>Mẫu Excel</span>
+          </button>
+
+          <button
+            onClick={onOpenDataCleaner}
+            title="Làm gọn danh xưng, chuẩn hóa SĐT, tính lại công nợ & gộp bản ghi trùng lặp"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+            <span>Làm Gọn Dữ Liệu</span>
           </button>
 
           <button

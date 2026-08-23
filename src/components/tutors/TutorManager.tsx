@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TutorAssistant, TutorStatus } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
+import { ExcelImportModal } from '../excel/ExcelModals';
 import {
   GraduationCap,
   Search,
@@ -10,6 +11,7 @@ import {
   Phone,
   Building,
   X,
+  Upload,
 } from 'lucide-react';
 
 export const TutorManager: React.FC = () => {
@@ -19,6 +21,7 @@ export const TutorManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedTutor, setSelectedTutor] = useState<TutorAssistant | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Form state for adding tutor
   const [formData, setFormData] = useState({
@@ -110,13 +113,23 @@ export const TutorManager: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs lg:text-sm font-semibold shadow-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Thêm Trợ Giảng Mới</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs lg:text-sm font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Upload className="w-4 h-4 text-purple-600" />
+            <span>Nhập Ứng Viên Từ Excel (BM1)</span>
+          </button>
+
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs lg:text-sm font-semibold shadow-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Thêm Trợ Giảng Mới</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
@@ -434,6 +447,12 @@ export const TutorManager: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
     </div>
   );
 };

@@ -38,6 +38,7 @@ import {
   ROLE_PERMISSION_CONFIGS,
 } from '../data/initialData';
 import { ExcelImportResult } from '../utils/excelParser';
+import { cleanAndNormalizeAllData } from '../utils/dataCleaner';
 
 interface AppContextType {
   // Authentication & Session
@@ -115,9 +116,20 @@ interface AppContextType {
   deleteUser: (id: string) => void;
   toggleUserStatus: (id: string) => void;
 
-  // Excel Import
+  // Excel Import & Data Operations
   importExcelData: (data: ExcelImportResult, duplicateAction: 'merge' | 'create_new' | 'skip') => { addedStudents: number; addedExpenses: number; addedLeads: number; addedTutors: number };
+  cleanAndNormalizeData: (options?: { cleanNames?: boolean; cleanPhones?: boolean; recalcTuition?: boolean; deduplicate?: boolean; removeEmpty?: boolean }) => {
+    fixedNames: number;
+    fixedPhones: number;
+    recalculatedFinances: number;
+    removedDuplicates: number;
+    removedEmpty: number;
+  };
+  resetToCompactData: () => void;
+  clearAllData: () => void;
   resetAllData: () => void;
+  isCompactView: boolean;
+  setIsCompactView: (compact: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -828,28 +840,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Process Students
     const newStudentsToAdd: Student[] = [];
+    const newInvoicesToAdd: InvoiceRecord[] = [];
+
     data.students.forEach((item, index) => {
       if (item.isDuplicate && duplicateAction === 'skip') {
         return;
       }
 
       const id = `st-imp-${Date.now()}-${index}`;
-      const defaultEnrollments: Student['enrollments'] = [
-        {
-          id: `en-${id}-1`,
-          subjectId: 'sub-toan',
-          subjectName: 'Toán học',
-          monthlyFee: 1000000,
-          discount: 0,
-          finalFee: 1000000,
-          startDate: new Date().toISOString().split('T')[0],
-          status: 'active',
-        },
-      ];
+      const defaultEnrollments: Student['enrollments'] =
+        item.data.enrollments && item.data.enrollments.length > 0
+          ? item.data.enrollments
+          : [
+              {
+                id: `en-${id}-1`,
+                subjectId: 'sub-toan',
+                subjectName: 'Toán học',
+                monthlyFee: 1000000,
+                discount: 0,
+                finalFee: 1000000,
+                startDate: new Date().toISOString().split('T')[0],
+                status: 'active',
+              },
+            ];
+
+      const totalTuitionDue =
+        item.data.totalTuitionDue !== undefined
+          ? item.data.totalTuitionDue
+          : defaultEnrollments.reduce((sum, e) => sum + e.finalFee, 0);
+
+      const totalPaid =
+        item.data.totalPaid !== undefined ? item.data.totalPaid : totalTuitionDue;
+
+      const remainingDebt =
+        item.data.remainingDebt !== undefined
+          ? item.data.remainingDebt
+          : Math.max(0, totalTuitionDue - totalPaid);
 
       const newStudent: Student = {
         id,
-        code: item.isDuplicate && duplicateAction === 'create_new' ? `${item.data.code}-NEW` : item.data.code || `AT-K${item.grade}-${index + 10}`,
+        code:
+          item.isDuplicate && duplicateAction === 'create_new'
+            ? `${item.data.code}-NEW`
+            : item.data.code || `AT-K${item.grade}-${index + 10}`,
         fullName: item.data.fullName || 'Học sinh mới',
         dob: item.data.dob || '2012-01-01',
         gender: (item.data.gender as any) || 'Nam',
@@ -863,21 +896,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'active',
         parentName: item.data.parentName || 'Phụ huynh',
         parentPhone: item.data.parentPhone || item.data.phone || '',
-        parentRelationship: 'Bố',
+        parentRelationship: (item.data.parentRelationship as any) || 'Bố',
         notes: item.data.notes || 'Import từ file Excel',
         enrollments: defaultEnrollments,
-        joinedDate: new Date().toISOString().split('T')[0],
-        totalTuitionDue: 1000000,
-        totalPaid: 1000000,
-        remainingDebt: 0,
+        joinedDate: item.data.joinedDate || new Date().toISOString().split('T')[0],
+        totalTuitionDue,
+        totalPaid,
+        remainingDebt,
       };
 
       newStudentsToAdd.push(newStudent);
       addedStudents++;
+
+      // Create an invoice record if tuition is due
+      if (totalTuitionDue > 0) {
+        const invStatus =
+          remainingDebt === 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+        const newInvoice: InvoiceRecord = {
+          id: `inv-imp-${Date.now()}-${index}`,
+          invoiceCode: `INV-202608-${newStudent.code}`,
+          studentId: id,
+          studentName: newStudent.fullName,
+          studentCode: newStudent.code,
+          grade: newStudent.grade,
+          month: 8,
+          year: 2026,
+          totalAmount: totalTuitionDue,
+          paidAmount: totalPaid,
+          remainingAmount: remainingDebt,
+          status: invStatus,
+          dueDate: '2026-08-15',
+          lineItems: defaultEnrollments.map((en) => ({
+            id: `item-${en.id}`,
+            subjectId: en.subjectId,
+            subjectName: en.subjectName,
+            amount: en.finalFee,
+          })),
+          paymentHistory:
+            totalPaid > 0
+              ? [
+                  {
+                    id: `pay-imp-${Date.now()}-${index}`,
+                    invoiceId: `inv-imp-${Date.now()}-${index}`,
+                    studentId: id,
+                    studentName: newStudent.fullName,
+                    amount: totalPaid,
+                    paymentDate: new Date().toISOString().split('T')[0],
+                    method: 'bank_transfer',
+                    collectedBy: 'Kế toán',
+                    notes: 'Đã nộp theo dữ liệu Excel',
+                  },
+                ]
+              : [],
+          createdAt: new Date().toISOString().split('T')[0],
+        };
+        newInvoicesToAdd.push(newInvoice);
+      }
     });
 
     if (newStudentsToAdd.length > 0) {
       setStudents((prev) => [...newStudentsToAdd, ...prev]);
+    }
+    if (newInvoicesToAdd.length > 0) {
+      setInvoices((prev) => [...newInvoicesToAdd, ...prev]);
     }
 
     // Process Expenses
@@ -966,7 +1047,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { addedStudents, addedExpenses, addedLeads, addedTutors };
   };
 
-  const resetAllData = () => {
+  const [isCompactView, setIsCompactView] = useState<boolean>(() => {
+    return localStorage.getItem(`${STORAGE_KEY}_isCompactView`) === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_KEY}_isCompactView`, isCompactView ? 'true' : 'false');
+  }, [isCompactView]);
+
+  const cleanAndNormalizeData = (options = {
+    cleanNames: true,
+    cleanPhones: true,
+    recalcTuition: true,
+    deduplicate: true,
+    removeEmpty: true,
+  }) => {
+    const result = cleanAndNormalizeAllData(students, invoices, expenses, leads, tutors, options);
+    setStudents(result.cleanedStudents);
+    setInvoices(result.cleanedInvoices);
+    setExpenses(result.cleanedExpenses);
+    setLeads(result.cleanedLeads);
+    setTutors(result.cleanedTutors);
+    return result.stats;
+  };
+
+  const resetToCompactData = () => {
     localStorage.clear();
     setStudents(INITIAL_STUDENTS);
     setSubjects(INITIAL_SUBJECTS);
@@ -981,6 +1086,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLessons(INITIAL_LMS_LESSONS);
     setAssignments(INITIAL_ASSIGNMENTS);
     setSubmissions(INITIAL_SUBMISSIONS);
+  };
+
+  const clearAllData = () => {
+    setStudents([]);
+    setInvoices([]);
+    setExpenses([]);
+    setLeads([]);
+    setTutors([]);
+    setAttendance([]);
+    setSubmissions([]);
+  };
+
+  const resetAllData = () => {
+    resetToCompactData();
   };
 
   return (
@@ -1044,7 +1163,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteUser,
         toggleUserStatus,
         importExcelData,
+        cleanAndNormalizeData,
+        resetToCompactData,
+        clearAllData,
         resetAllData,
+        isCompactView,
+        setIsCompactView,
       }}
     >
       {children}
