@@ -16,6 +16,8 @@ import {
   Calculator,
   Copy,
   TableProperties,
+  Cloud,
+  Server,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -36,6 +38,8 @@ export const DataCleanerModal: React.FC<DataCleanerModalProps> = ({ isOpen, onCl
     clearAllData,
     isCompactView,
     setIsCompactView,
+    isLoadingFromCloud,
+    isFirebaseConnected,
   } = useApp();
 
   const [options, setOptions] = useState({
@@ -174,6 +178,46 @@ export const DataCleanerModal: React.FC<DataCleanerModalProps> = ({ isOpen, onCl
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-700 text-sm">
           {activeTab === 'clean' && (
             <>
+              {/* Database Persistence Info Banner */}
+              <div className="p-4 rounded-xl border flex items-center justify-between bg-emerald-50/20 border-emerald-200/50">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg border shadow-2xs ${
+                    isLoadingFromCloud 
+                      ? 'bg-amber-50 text-amber-600 border-amber-200 animate-spin' 
+                      : isFirebaseConnected 
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                      : 'bg-slate-50 text-slate-500 border-slate-200'
+                  }`}>
+                    {isLoadingFromCloud ? (
+                      <RefreshCw className="w-5 h-5" />
+                    ) : (
+                      <Cloud className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                      <span>Cơ Sở Dữ Liệu Đồng Bộ Đám Mây</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                        isLoadingFromCloud
+                          ? 'bg-amber-100 text-amber-800 animate-pulse'
+                          : isFirebaseConnected
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {isLoadingFromCloud ? 'Đang tải...' : isFirebaseConnected ? 'Đã kết nối' : 'Ngoại tuyến'}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {isLoadingFromCloud 
+                        ? 'Đang tải và đồng bộ toàn bộ dữ liệu từ Google Firebase Firestore...' 
+                        : isFirebaseConnected 
+                        ? 'Dữ liệu của bạn được tự động lưu trữ và đồng bộ liên tục lên Cloud Firestore của Google. An tâm tuyệt đối khi nâng cấp phần mềm.' 
+                        : 'Không thể kết nối Cloud. Toàn bộ dữ liệu của bạn đang được lưu tạm cục bộ trên trình duyệt.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Density View Toggle Banner */}
               <div className="p-4 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-3">

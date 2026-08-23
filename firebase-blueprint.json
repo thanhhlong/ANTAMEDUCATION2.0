@@ -1,0 +1,164 @@
+{
+  "schemas": {
+    "students": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "fullName": { "type": "string", "required": true },
+        "code": { "type": "string", "required": true },
+        "grade": { "type": "number", "required": true },
+        "className": { "type": "string", "required": true },
+        "gender": { "type": "string", "required": true },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "parentName": { "type": "string" },
+        "parentPhone": { "type": "string" },
+        "zalo": { "type": "string" },
+        "currentSchool": { "type": "string" },
+        "notes": { "type": "string" },
+        "enrollments": { "type": "array" },
+        "totalTuitionDue": { "type": "number" },
+        "totalPaid": { "type": "number" },
+        "remainingDebt": { "type": "number" },
+        "tuitionWaived": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "subjects": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "code": { "type": "string", "required": true },
+        "grade": { "type": "number", "required": true },
+        "basePrice": { "type": "number", "required": true },
+        "description": { "type": "string" }
+      }
+    },
+    "tuitionPlans": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "discountPercent": { "type": "number" },
+        "months": { "type": "number" },
+        "description": { "type": "string" }
+      }
+    },
+    "invoices": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "invoiceNumber": { "type": "string", "required": true },
+        "studentId": { "type": "string", "required": true },
+        "studentName": { "type": "string", "required": true },
+        "amount": { "type": "number", "required": true },
+        "dueDate": { "type": "string", "required": true },
+        "paidDate": { "type": "string" },
+        "status": { "type": "string", "required": true },
+        "paymentMethod": { "type": "string" },
+        "note": { "type": "string" },
+        "period": { "type": "string" },
+        "items": { "type": "array" }
+      }
+    },
+    "expenses": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "title": { "type": "string", "required": true },
+        "category": { "type": "string", "required": true },
+        "amount": { "type": "number", "required": true },
+        "date": { "type": "string", "required": true },
+        "payee": { "type": "string" },
+        "note": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "leads": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "parentName": { "type": "string", "required": true },
+        "phone": { "type": "string", "required": true },
+        "studentName": { "type": "string" },
+        "grade": { "type": "number" },
+        "subjectId": { "type": "string" },
+        "status": { "type": "string", "required": true },
+        "source": { "type": "string" },
+        "notes": { "type": "string" },
+        "zalo": { "type": "string" },
+        "createdAt": { "type": "string", "required": true }
+      }
+    },
+    "tutors": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "fullName": { "type": "string", "required": true },
+        "phone": { "type": "string", "required": true },
+        "email": { "type": "string" },
+        "subjects": { "type": "array" },
+        "classes": { "type": "array" },
+        "status": { "type": "string", "required": true },
+        "hourlyRate": { "type": "number" },
+        "bankName": { "type": "string" },
+        "bankAccount": { "type": "string" }
+      }
+    },
+    "classes": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "subjectId": { "type": "string", "required": true },
+        "teacherId": { "type": "string" },
+        "tutorId": { "type": "string" },
+        "schedule": { "type": "string" },
+        "room": { "type": "string" },
+        "active": { "type": "boolean" }
+      }
+    },
+    "attendance": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "classId": { "type": "string", "required": true },
+        "date": { "type": "string", "required": true },
+        "records": { "type": "array" }
+      }
+    },
+    "lessons": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "classId": { "type": "string", "required": true },
+        "title": { "type": "string", "required": true },
+        "content": { "type": "string" },
+        "date": { "type": "string" }
+      }
+    },
+    "assignments": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "lessonId": { "type": "string", "required": true },
+        "title": { "type": "string", "required": true },
+        "dueDate": { "type": "string" }
+      }
+    },
+    "submissions": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "assignmentId": { "type": "string", "required": true },
+        "studentId": { "type": "string", "required": true },
+        "studentName": { "type": "string" },
+        "status": { "type": "string" },
+        "grade": { "type": "number" },
+        "submittedAt": { "type": "string" },
+        "feedback": { "type": "string" }
+      }
+    },
+    "users": {
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "username": { "type": "string", "required": true },
+        "fullName": { "type": "string", "required": true },
+        "role": { "type": "string", "required": true },
+        "email": { "type": "string", "required": true },
+        "phone": { "type": "string" },
+        "studentCode": { "type": "string" },
+        "password": { "type": "string" }
+      }
+    }
+  }
+}
