@@ -41,6 +41,8 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
   const filteredInvoices = selectedGrade === 'all' ? invoices : invoices.filter((i) => i.grade === selectedGrade);
 
   const totalStudents = filteredStudents.length;
+  const activeStudents = filteredStudents.filter((s) => s.status === 'active').length;
+  const droppedStudents = filteredStudents.filter((s) => s.status === 'dropped').length;
   const totalTutors = tutors.length;
   const totalLeads = leads.length;
 
@@ -79,52 +81,6 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto text-slate-800">
-      {/* Official Program Notification Bar */}
-      <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-2.5 w-2.5 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
-          </span>
-          <div>
-            <strong className="text-emerald-950 font-bold">Chương Trình Đào Tạo Chính Thức 2026 - 2027</strong>
-            <span className="text-emerald-700 ml-2 hidden sm:inline">• Khối 6, 7, 8, 9 với 5 trụ cột môn học & 3 ca học chuẩn</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <a
-            href="/antam-education-hosting.zip"
-            download="antam-education-hosting.zip"
-            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1"
-            title="Tải gói đóng gói chuẩn sẵn sàng upload thẳng lên Hosting (cPanel, Viettel IDC, DirectAdmin)"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Tải Gói Hosting (ZIP)</span>
-          </a>
-          <a
-            href="/antam-education-full.zip"
-            download="antam-education-full.zip"
-            className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1"
-            title="Tải toàn bộ mã nguồn & bản dựng offline để chạy trực tiếp trên máy tính"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Bản Offline</span>
-          </a>
-          <button
-            onClick={() => onNavigate('timetable')}
-            className="px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold hover:bg-emerald-100/60 transition-colors cursor-pointer shadow-2xs"
-          >
-            Xem TKB Chuẩn
-          </button>
-          <button
-            onClick={() => onNavigate('subjects')}
-            className="px-2.5 py-1 rounded-lg bg-emerald-700 text-white font-bold hover:bg-emerald-800 transition-colors cursor-pointer shadow-2xs"
-          >
-            Xem Khung Môn Học
-          </button>
-        </div>
-      </div>
-
       {/* Header with Quick Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -187,11 +143,11 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-slate-900">{totalStudents}</span>
-            <span className="text-xs text-emerald-600 font-bold">↑ 100% hoạt động</span>
+            <span className="text-3xl font-bold text-slate-900">{activeStudents}</span>
+            <span className="text-xs text-emerald-600 font-bold">/ {totalStudents} tổng HS</span>
           </div>
           <div className="mt-2 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>Khối lớp 6, 7, 8, 9 THCS</span>
+            <span>{droppedStudents > 0 ? `${droppedStudents} HS đã nghỉ` : 'Khối 6, 7, 8, 9 THCS'}</span>
             <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600" />
           </div>
         </div>

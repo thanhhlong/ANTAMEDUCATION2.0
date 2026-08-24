@@ -1130,7 +1130,7 @@ export const TimetableManager: React.FC<TimetableManagerProps> = ({ onTakeAttend
                     onChange={(e) => setFormData({ ...formData, grade: Number(e.target.value) })}
                     className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-emerald-600 focus:outline-none"
                   >
-                    {[6, 7, 8, 9, 10, 11, 12].map((g) => (
+                    {[6, 7, 8, 9].map((g) => (
                       <option key={g} value={g}>
                         Khối {g}
                       </option>

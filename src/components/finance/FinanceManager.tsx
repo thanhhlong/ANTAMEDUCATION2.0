@@ -214,7 +214,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
         description: 'Môn học bổ sung',
         defaultFee: newSubjectFee,
         color: newSubjectColor,
-        gradeLevels: [6, 7, 8, 9, 10, 11, 12],
+        gradeLevels: [6, 7, 8, 9],
         active: true,
       });
       alert(`Đã thêm môn học ${newSubjectName.trim()} thành công!`);
@@ -577,7 +577,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
               {/* Inner Grade Selector */}
               <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
                 <span className="text-xs text-slate-500 font-bold px-2 uppercase tracking-wider">CHỌN KHỐI LỚP ĐỂ ĐIỀU CHỈNH:</span>
-                {[6, 7, 8, 9, 10, 11, 12].map((g) => (
+                {[6, 7, 8, 9].map((g) => (
                   <button
                     key={g}
                     onClick={() => setEditingGrade(g)}

@@ -3,17 +3,13 @@ import { useApp } from '../../context/AppContext';
 import { UserRole } from '../../types';
 import { AnTamLogo } from './AnTamLogo';
 import {
-  Sparkles,
   FileSpreadsheet,
-  Download,
-  Upload,
   UserCheck,
   Shield,
   GraduationCap,
   Users,
   BookOpen,
   LogIn,
-  User as UserIcon,
   Menu,
 } from 'lucide-react';
 
@@ -129,26 +125,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Actions & User Auth */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <a
-            href="/antam-education-hosting.zip"
-            download="antam-education-hosting.zip"
-            className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-500 transition-colors cursor-pointer whitespace-nowrap shadow-2xs text-xs"
-            title="Tải gói đóng gói chuẩn sẵn sàng upload thẳng lên Hosting (cPanel, Viettel IDC, DirectAdmin)"
-          >
-            <Download className="w-3.5 h-3.5 text-white shrink-0" />
-            <span>Tải Gói Hosting (ZIP)</span>
-          </a>
-
-          <a
-            href="/antam-education-full.zip"
-            download="antam-education-full.zip"
-            className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition-colors cursor-pointer whitespace-nowrap shadow-2xs text-xs"
-            title="Tải toàn bộ mã nguồn & bản dựng offline để chạy trực tiếp trên máy tính"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-950 shrink-0" />
-            <span>Bản Offline Máy Tính</span>
-          </a>
-
           <button
             onClick={onOpenPublicForm}
             className="hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
@@ -163,31 +139,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span>Mẫu Excel</span>
-          </button>
-
-          <button
-            onClick={onOpenDataCleaner}
-            title="Làm gọn danh xưng, chuẩn hóa SĐT, tính lại công nợ & gộp bản ghi trùng lặp"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
-            <span>Làm Gọn Dữ Liệu</span>
-          </button>
-
-          <button
-            onClick={onOpenImport}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
-          >
-            <Upload className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Nhập Excel</span>
-          </button>
-
-          <button
-            onClick={onOpenExport}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-600" />
-            <span>Xuất Báo Cáo</span>
           </button>
 
           {/* User Auth Control */}

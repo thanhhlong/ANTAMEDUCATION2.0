@@ -8,7 +8,7 @@ export type UserRole =
   | 'STUDENT'
   | 'PARENT';
 
-export type StudentStatus = 'active' | 'paused' | 'graduated' | 'trial';
+export type StudentStatus = 'active' | 'dropped';
 export type PaymentStatus = 'paid' | 'partial' | 'unpaid' | 'overdue';
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'qr_code' | 'momo' | 'vnpay';
 
@@ -19,7 +19,7 @@ export interface Subject {
   description: string;
   defaultFee: number; // e.g. 1000000 (Toán), 400000 (Văn, Anh, KHTN)
   color: string;
-  gradeLevels: number[]; // [6, 7, 8, 9, 10, 11, 12]
+  gradeLevels: number[]; // [6, 7, 8, 9]
   iconName?: string;
   active: boolean;
   gradeFees?: { [grade: number]: number }; // Specific overrides per grade
@@ -44,7 +44,7 @@ export interface StudentEnrollment {
   discount: number;
   finalFee: number;
   startDate: string;
-  status: 'active' | 'paused' | 'dropped';
+  status: 'active' | 'dropped';
   classId?: string;
   notes?: string;
 }
@@ -61,9 +61,10 @@ export interface Student {
   email: string;
   address: string;
   currentSchool: string; // e.g. "THCS Trưng Vương"
-  grade: number; // 6, 7, 8, 9, 10, 11, 12
+  grade: number; // 6, 7, 8, 9
   className: string; // e.g. "8A1"
-  status: StudentStatus;
+  status: StudentStatus; // 'active' (Đang học) | 'dropped' (Nghỉ học)
+  leaveDate?: string; // Ngày tháng năm nghỉ học (YYYY-MM-DD)
   parentName: string;
   parentPhone: string;
   parentZalo?: string;
@@ -76,7 +77,8 @@ export interface Student {
   totalTuitionDue: number; // Auto calculated sum
   totalPaid: number;
   remainingDebt: number;
-  tuitionWaived?: boolean; // Flag to indicate 100% tuition waiving
+  tuitionDiscountPercent?: number; // Tỉ lệ phần trăm miễn giảm học phí (0% - 100%)
+  tuitionWaived?: boolean; // Tương đương 100% miễn học phí
 }
 
 export interface PaymentTransaction {

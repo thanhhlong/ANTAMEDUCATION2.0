@@ -265,9 +265,17 @@ export function cleanAndNormalizeAllData(
 
     // Recalculate tuitions
     if (options.recalcTuition) {
-      const calculatedTuitionDue = updated.enrollments && updated.enrollments.length > 0
+      const grossDue = updated.enrollments && updated.enrollments.length > 0
         ? updated.enrollments.reduce((sum, e) => sum + (e.finalFee ?? e.monthlyFee ?? 0), 0)
         : updated.totalTuitionDue;
+
+      let calculatedTuitionDue = grossDue;
+      if (updated.tuitionWaived) {
+        calculatedTuitionDue = 0;
+      } else if (updated.tuitionDiscountPercent !== undefined && updated.tuitionDiscountPercent > 0) {
+        const discountRatio = Math.min(100, Math.max(0, updated.tuitionDiscountPercent)) / 100;
+        calculatedTuitionDue = Math.round(grossDue * (1 - discountRatio));
+      }
 
       const remaining = Math.max(0, calculatedTuitionDue - (updated.totalPaid || 0));
 

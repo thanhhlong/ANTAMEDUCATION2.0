@@ -585,7 +585,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       onChange={(e) => setRegGrade(Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 rounded-md bg-white border border-slate-200 text-xs text-slate-800"
                     >
-                      {[6, 7, 8, 9, 10, 11, 12].map((g) => (
+                      {[6, 7, 8, 9].map((g) => (
                         <option key={g} value={g}>
                           Khối {g}
                         </option>

@@ -24,7 +24,7 @@ export const INITIAL_SUBJECTS: Subject[] = [
     description: 'Toán tư duy, Đại số, Hình học & Luyện thi vào 10',
     defaultFee: 1000000,
     color: '#3B82F6',
-    gradeLevels: [6, 7, 8, 9, 10, 11, 12],
+    gradeLevels: [6, 7, 8, 9],
     active: true,
   },
   {
@@ -34,7 +34,7 @@ export const INITIAL_SUBJECTS: Subject[] = [
     description: 'Đọc hiểu, Nghị luận văn học, Nghị luận xã hội & Kỹ năng viết',
     defaultFee: 400000,
     color: '#EC4899',
-    gradeLevels: [6, 7, 8, 9, 10, 11, 12],
+    gradeLevels: [6, 7, 8, 9],
     active: true,
   },
   {
@@ -44,7 +44,7 @@ export const INITIAL_SUBJECTS: Subject[] = [
     description: 'Ngữ pháp chuyên sâu, Từ vựng, Kỹ năng nghe nói & Luyện thi',
     defaultFee: 400000,
     color: '#10B981',
-    gradeLevels: [6, 7, 8, 9, 10, 11, 12],
+    gradeLevels: [6, 7, 8, 9],
     active: true,
   },
   {
@@ -64,7 +64,7 @@ export const INITIAL_SUBJECTS: Subject[] = [
     description: 'Bồi dưỡng học sinh giỏi & ôn thi chuyên',
     defaultFee: 500000,
     color: '#8B5CF6',
-    gradeLevels: [8, 9, 10, 11, 12],
+    gradeLevels: [8, 9],
     active: true,
   },
   {
@@ -74,7 +74,7 @@ export const INITIAL_SUBJECTS: Subject[] = [
     description: 'Hóa học đại cương & Luyện đề vào 10 chuyên',
     defaultFee: 500000,
     color: '#06B6D4',
-    gradeLevels: [8, 9, 10, 11, 12],
+    gradeLevels: [8, 9],
     active: true,
   },
 ];
@@ -999,7 +999,7 @@ export const INITIAL_TUTORS: TutorAssistant[] = [
     university: 'Đại học Ngoại Thương',
     major: 'Kinh tế Đối ngoại',
     subjectsCanTeach: ['Tiếng Anh'],
-    gradesCanTeach: [6, 7, 8, 9, 10, 11, 12],
+    gradesCanTeach: [6, 7, 8, 9],
     experienceYears: 3,
     bio: 'IELTS 8.5 (Listening 9.0, Reading 9.0), 3 năm kinh nghiệm luyện thi vào 10 chuyên Anh.',
     expectations: 'Trợ giảng các lớp buổi tối và ôn thi chuyên.',

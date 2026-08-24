@@ -723,18 +723,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Recalculate student total tuition
-  const calculateStudentFees = (enrollments: Student['enrollments'], totalPaid: number, tuitionWaived?: boolean) => {
-    const totalDue = tuitionWaived ? 0 : enrollments.reduce((acc, curr) => acc + (curr.finalFee || 0), 0);
+  const calculateStudentFees = (
+    enrollments: Student['enrollments'],
+    totalPaid: number,
+    tuitionWaived?: boolean,
+    tuitionDiscountPercent?: number
+  ) => {
+    const grossDue = enrollments.reduce((acc, curr) => acc + (curr.finalFee || 0), 0);
+    let totalDue = grossDue;
+    if (tuitionWaived) {
+      totalDue = 0;
+    } else if (tuitionDiscountPercent !== undefined && tuitionDiscountPercent > 0) {
+      const discountRatio = Math.min(100, Math.max(0, tuitionDiscountPercent)) / 100;
+      totalDue = Math.round(grossDue * (1 - discountRatio));
+    }
     const remaining = Math.max(0, totalDue - totalPaid);
     return { totalTuitionDue: totalDue, remainingDebt: remaining };
   };
 
   const addStudent = (studentData: Omit<Student, 'id' | 'totalTuitionDue' | 'totalPaid' | 'remainingDebt'>): Student => {
     const id = `st-${Date.now()}`;
-    const { totalTuitionDue, remainingDebt } = calculateStudentFees(studentData.enrollments, 0, studentData.tuitionWaived);
+    const effectiveDiscountPercent = studentData.tuitionWaived ? 100 : (studentData.tuitionDiscountPercent || 0);
+    const effectiveWaived = effectiveDiscountPercent === 100;
+    const { totalTuitionDue, remainingDebt } = calculateStudentFees(
+      studentData.enrollments,
+      0,
+      effectiveWaived,
+      effectiveDiscountPercent
+    );
     const newStudent: Student = {
       ...studentData,
       id,
+      tuitionDiscountPercent: effectiveDiscountPercent,
+      tuitionWaived: effectiveWaived,
       totalTuitionDue,
       totalPaid: 0,
       remainingDebt,
@@ -778,11 +799,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (st.id === id) {
           const updatedEnrollments = updates.enrollments || st.enrollments;
           const updatedPaid = updates.totalPaid !== undefined ? updates.totalPaid : st.totalPaid;
-          const updatedWaived = updates.tuitionWaived !== undefined ? updates.tuitionWaived : st.tuitionWaived;
-          const { totalTuitionDue, remainingDebt } = calculateStudentFees(updatedEnrollments, updatedPaid, updatedWaived);
+          const updatedDiscountPercent = updates.tuitionDiscountPercent !== undefined
+            ? updates.tuitionDiscountPercent
+            : updates.tuitionWaived !== undefined
+            ? (updates.tuitionWaived ? 100 : 0)
+            : (st.tuitionDiscountPercent || 0);
+          const updatedWaived = updates.tuitionWaived !== undefined
+            ? updates.tuitionWaived
+            : updatedDiscountPercent === 100;
+
+          const { totalTuitionDue, remainingDebt } = calculateStudentFees(
+            updatedEnrollments,
+            updatedPaid,
+            updatedWaived,
+            updatedDiscountPercent
+          );
           return {
             ...st,
             ...updates,
+            tuitionDiscountPercent: updatedDiscountPercent,
+            tuitionWaived: updatedWaived,
             totalTuitionDue,
             remainingDebt,
           };

@@ -716,9 +716,11 @@ export function exportStudentsToExcel(students: Student[], fileName = 'ANTAM_Dan
     'Địa chỉ': s.address,
     'Môn đăng ký': s.enrollments.map((e) => e.subjectName).join(', '),
     'Học phí hàng tháng (VNĐ)': s.totalTuitionDue,
+    'Tỉ lệ giảm (%)': s.tuitionDiscountPercent || (s.tuitionWaived ? 100 : 0),
     'Đã nộp (VNĐ)': s.totalPaid,
     'Công nợ còn lại (VNĐ)': s.remainingDebt,
-    'Trạng thái': s.status === 'active' ? 'Đang học' : s.status === 'paused' ? 'Tạm dừng' : 'Học thử',
+    'Trạng thái': s.status === 'active' ? 'Đang học' : 'Nghỉ học',
+    'Ngày nghỉ học': s.leaveDate || '',
     'Ghi chú': s.notes || '',
   }));
 
@@ -1166,7 +1168,7 @@ export const generateCenterExcelExport = (
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(dashRows), 'DASHBOARD');
 
   // Sheets by Grade
-  [6, 7, 8, 9, 10, 11, 12].forEach((g) => {
+  [6, 7, 8, 9].forEach((g) => {
     const gStudents = students.filter((s) => s.grade === g);
     if (gStudents.length > 0) {
       const gRows = gStudents.map((st) => ({

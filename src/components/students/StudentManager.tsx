@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Student } from '../../types';
+import { Student, StudentStatus } from '../../types';
 import { formatCurrency, formatShortCurrency } from '../../utils/formatters';
 import { exportTuitionStudentsExcel } from '../../utils/excelParser';
 import { TuitionExportModal } from '../finance/TuitionExportModal';
@@ -18,12 +18,15 @@ import {
   ShieldAlert,
   CreditCard,
   FileSpreadsheet,
-  Download,
   Upload,
   AlertTriangle,
   RefreshCw,
   Sparkles,
   TableProperties,
+  Calendar,
+  Percent,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -47,6 +50,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | StudentStatus>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'debt'>('all');
 
   // Export Modal state
@@ -70,15 +74,17 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
     email: '',
     address: 'Hà Nội',
     currentSchool: 'THCS Cầu Giấy',
-    grade: 8,
+    grade: 8 as 6 | 7 | 8 | 9,
     className: '8A1',
-    status: 'active' as const,
+    status: 'active' as StudentStatus,
+    leaveDate: '',
     parentName: '',
     parentPhone: '',
     parentRelationship: 'Bố' as const,
     notes: '',
     enrolledSubjectIds: ['sub-toan'],
     customSubjectFees: {} as { [subjectId: string]: number },
+    tuitionDiscountPercent: 0,
     tuitionWaived: false,
   });
 
@@ -86,8 +92,11 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
 
   // Filter students
   const filtered = students.filter((s) => {
-    // Grade filter
+    // Grade filter (only 6, 7, 8, 9)
     if (selectedGrade !== 'all' && s.grade !== selectedGrade) return false;
+
+    // Status filter (active or dropped)
+    if (statusFilter !== 'all' && s.status !== statusFilter) return false;
 
     // Search query
     if (searchQuery.trim()) {
@@ -132,7 +141,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
   };
 
   const handleOpenAdd = () => {
-    const nextGrade = selectedGrade === 'all' ? 8 : selectedGrade;
+    const nextGrade = (selectedGrade === 'all' ? 8 : selectedGrade) as 6 | 7 | 8 | 9;
     const defaultCode = generateNextStudentCode(nextGrade);
     setFormData({
       code: defaultCode,
@@ -147,12 +156,14 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
       grade: nextGrade,
       className: `${nextGrade}A1`,
       status: 'active',
+      leaveDate: '',
       parentName: '',
       parentPhone: '',
       parentRelationship: 'Bố',
       notes: '',
       enrolledSubjectIds: ['sub-toan'],
       customSubjectFees: {},
+      tuitionDiscountPercent: 0,
       tuitionWaived: false,
     });
     setDuplicateWarning(null);
@@ -167,6 +178,10 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
       initialCustomFees[e.subjectId] = e.finalFee;
     });
 
+    const initialDiscount = student.tuitionWaived
+      ? 100
+      : (student.tuitionDiscountPercent ?? 0);
+
     setFormData({
       code: student.code,
       fullName: student.fullName,
@@ -177,16 +192,18 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
       email: student.email,
       address: student.address,
       currentSchool: student.currentSchool,
-      grade: student.grade,
+      grade: (student.grade >= 6 && student.grade <= 9 ? student.grade : 8) as 6 | 7 | 8 | 9,
       className: student.className,
-      status: student.status,
+      status: student.status === 'dropped' ? 'dropped' : 'active',
+      leaveDate: student.leaveDate || (student.status === 'dropped' ? new Date().toISOString().split('T')[0] : ''),
       parentName: student.parentName,
       parentPhone: student.parentPhone,
       parentRelationship: student.parentRelationship as any,
       notes: student.notes || '',
       enrolledSubjectIds: student.enrollments.map((e) => e.subjectId),
       customSubjectFees: initialCustomFees,
-      tuitionWaived: !!student.tuitionWaived,
+      tuitionDiscountPercent: initialDiscount,
+      tuitionWaived: initialDiscount === 100,
     });
     setDuplicateWarning(null);
     setIsAddModalOpen(true);
@@ -210,10 +227,31 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
     }
   };
 
+  // Calculate gross form fee
+  const grossFormFee = formData.enrolledSubjectIds.reduce((sum, subId) => {
+    const sub = subjects.find((s) => s.id === subId);
+    if (!sub) return sum;
+    if (formData.customSubjectFees[subId] !== undefined) {
+      return sum + formData.customSubjectFees[subId];
+    }
+    const gradeSpecificFee = sub.gradeFees && sub.gradeFees[formData.grade] !== undefined
+      ? sub.gradeFees[formData.grade]
+      : sub.defaultFee;
+    return sum + gradeSpecificFee;
+  }, 0);
+
+  const discountAmount = Math.round(grossFormFee * (formData.tuitionDiscountPercent / 100));
+  const netFormFee = Math.max(0, grossFormFee - discountAmount);
+
   const handleSaveStudent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName.trim()) {
       alert('Vui lòng nhập họ và tên học sinh');
+      return;
+    }
+
+    if (formData.status === 'dropped' && !formData.leaveDate) {
+      alert('Vui lòng chọn ngày tháng năm nghỉ học khi trạng thái là "Nghỉ học"');
       return;
     }
 
@@ -237,18 +275,27 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
         discount: 0,
         finalFee: finalFeeToUse,
         startDate: new Date().toISOString().split('T')[0],
-        status: 'active' as const,
+        status: formData.status === 'dropped' ? ('dropped' as const) : ('active' as const),
       };
     });
 
+    const isWaived = formData.tuitionDiscountPercent === 100;
+
+    const payload = {
+      ...formData,
+      tuitionWaived: isWaived,
+      tuitionDiscountPercent: formData.tuitionDiscountPercent,
+      leaveDate: formData.status === 'dropped' ? formData.leaveDate : undefined,
+    };
+
     if (editingStudent) {
       updateStudent(editingStudent.id, {
-        ...formData,
+        ...payload,
         enrollments: newEnrollments,
       });
     } else {
       addStudent({
-        ...formData,
+        ...payload,
         enrollments: newEnrollments,
         joinedDate: new Date().toISOString().split('T')[0],
       });
@@ -256,19 +303,6 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
 
     setIsAddModalOpen(false);
   };
-
-  // Auto calculate total tuition in form
-  const totalFormFee = formData.tuitionWaived ? 0 : formData.enrolledSubjectIds.reduce((sum, subId) => {
-    const sub = subjects.find((s) => s.id === subId);
-    if (!sub) return sum;
-    if (formData.customSubjectFees[subId] !== undefined) {
-      return sum + formData.customSubjectFees[subId];
-    }
-    const gradeSpecificFee = sub.gradeFees && sub.gradeFees[formData.grade] !== undefined
-      ? sub.gradeFees[formData.grade]
-      : sub.defaultFee;
-    return sum + gradeSpecificFee;
-  }, 0);
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto text-slate-800">
@@ -282,10 +316,10 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
           </div>
           <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2 mt-1">
             <Users className="w-6 h-6 text-indigo-600" />
-            <span>QUẢN LÝ HỌC SINH & ĐĂNG KÝ MÔN HỌC</span>
+            <span>QUẢN LÝ HỌC SINH (KHỐI 6 - 9)</span>
           </h1>
           <p className="text-xs lg:text-sm text-slate-500 mt-0.5">
-            Cơ sở dữ liệu tập trung toàn bộ khối (K6, K7, K8, K9) với tự động tính học phí theo môn & xuất báo cáo
+            Theo dõi trạng thái đang học/nghỉ học, quản lý miễn giảm học phí theo % và phân lớp THCS
           </p>
         </div>
 
@@ -321,7 +355,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
 
       {/* Filter Toolbar */}
       <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
-        {/* Row 1: Grade Tabs & Quick Stats & Fast Export */}
+        {/* Row 1: Grade Tabs (Only 6, 7, 8, 9) & Fast Export */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
             {[
@@ -350,6 +384,20 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             <div className="text-xs text-slate-500 hidden sm:flex items-center gap-3">
               <span>
                 Tổng hiển thị: <strong className="text-slate-800">{filtered.length}</strong> HS
+              </span>
+              <span className="text-slate-300">•</span>
+              <span>
+                Đang học:{' '}
+                <strong className="text-emerald-600">
+                  {students.filter((s) => s.status === 'active').length}
+                </strong>
+              </span>
+              <span className="text-slate-300">•</span>
+              <span>
+                Nghỉ học:{' '}
+                <strong className="text-rose-600">
+                  {students.filter((s) => s.status === 'dropped').length}
+                </strong>
               </span>
               <span className="text-slate-300">•</span>
               <span>
@@ -398,10 +446,10 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
           </div>
         </div>
 
-        {/* Row 2: Search & Dropdown Filters & Compact View */}
+        {/* Row 2: Search, Status Filter, Subject Filter & Dropdowns */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
           {/* Search Box */}
-          <div className="relative sm:col-span-5">
+          <div className="relative sm:col-span-4">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -412,8 +460,21 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             />
           </div>
 
+          {/* Status Filter (Đang học / Nghỉ học) */}
+          <div className="sm:col-span-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs lg:text-sm text-slate-800 font-semibold focus:outline-none focus:border-indigo-500"
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="active">Đang học</option>
+              <option value="dropped">Nghỉ học</option>
+            </select>
+          </div>
+
           {/* Subject Filter */}
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-2">
             <select
               value={selectedSubjectFilter}
               onChange={(e) => setSelectedSubjectFilter(e.target.value)}
@@ -466,6 +527,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
               <tr>
                 <th className={isCompactView ? 'px-3 py-2 font-bold' : 'px-4 py-3.5 font-bold'}>Học Sinh</th>
+                <th className={isCompactView ? 'px-2 py-2 font-bold' : 'px-3 py-3.5 font-bold'}>Trạng Thái</th>
                 <th className={isCompactView ? 'px-2 py-2 font-bold' : 'px-3 py-3.5 font-bold'}>Khối / Lớp</th>
                 <th className={isCompactView ? 'px-3 py-2 font-bold' : 'px-4 py-3.5 font-bold'}>Môn Đăng Ký</th>
                 <th className={isCompactView ? 'px-2 py-2 font-bold' : 'px-3 py-3.5 font-bold'}>Học Phí</th>
@@ -477,19 +539,24 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
                     Không tìm thấy học sinh nào phù hợp với bộ lọc.
                   </td>
                 </tr>
               ) : (
                 filtered.map((student) => {
                   const targetInv = invoices.find((i) => i.studentId === student.id);
+                  const isDropped = student.status === 'dropped';
+                  const discountPercent = student.tuitionDiscountPercent ?? (student.tuitionWaived ? 100 : 0);
+
                   return (
-                    <tr key={student.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={student.id} className={`hover:bg-slate-50/80 transition-colors ${isDropped ? 'bg-slate-50/40 opacity-80' : ''}`}>
                       {/* Name & Code */}
                       <td className={isCompactView ? 'px-3 py-1.5' : 'px-4 py-3.5'}>
                         <div className="flex items-center gap-2.5">
-                          <div className={`rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 shadow-2xs ${isCompactView ? 'w-7 h-7 text-[10px]' : 'w-9 h-9 text-xs'}`}>
+                          <div className={`rounded-lg font-bold flex items-center justify-center shrink-0 shadow-2xs ${
+                            isDropped ? 'bg-slate-400 text-white' : 'bg-indigo-600 text-white'
+                          } ${isCompactView ? 'w-7 h-7 text-[10px]' : 'w-9 h-9 text-xs'}`}>
                             {student.fullName.split(' ').pop()?.slice(0, 2).toUpperCase() || 'HS'}
                           </div>
                           <div>
@@ -504,12 +571,35 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                               {student.currentSchool && (
                                 <>
                                   <span>•</span>
-                                  <span className="truncate max-w-[140px]">{student.currentSchool}</span>
+                                  <span className="truncate max-w-[130px]">{student.currentSchool}</span>
                                 </>
                               )}
                             </div>
                           </div>
                         </div>
+                      </td>
+
+                      {/* Status: Active or Dropped with Leave Date */}
+                      <td className={isCompactView ? 'px-2 py-1.5' : 'px-3 py-3.5'}>
+                        {isDropped ? (
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              <UserX className="w-3 h-3 text-rose-500" />
+                              <span>Nghỉ học</span>
+                            </span>
+                            {student.leaveDate && (
+                              <div className="text-[9px] text-slate-500 font-mono mt-0.5 flex items-center gap-1">
+                                <Calendar className="w-2.5 h-2.5 text-slate-400" />
+                                <span>{student.leaveDate}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <UserCheck className="w-3 h-3 text-emerald-500" />
+                            <span>Đang học</span>
+                          </span>
+                        )}
                       </td>
 
                       {/* Grade & Class */}
@@ -534,20 +624,27 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                         </div>
                       </td>
 
-                      {/* Tuition Fee */}
+                      {/* Tuition Fee with Discount info */}
                       <td className={`whitespace-nowrap ${isCompactView ? 'px-2 py-1.5 text-xs' : 'px-3 py-3.5'}`}>
-                        {student.tuitionWaived ? (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
-                            Miễn 100%
+                        {discountPercent === 100 ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            Miễn 100% (0 ₫)
                           </span>
                         ) : (
-                          <span className="font-bold text-slate-900">{formatCurrency(student.totalTuitionDue)}</span>
+                          <div>
+                            <div className="font-bold text-slate-900">{formatCurrency(student.totalTuitionDue)}</div>
+                            {discountPercent > 0 && (
+                              <div className="text-[9px] text-amber-700 font-bold bg-amber-50 px-1 py-0.2 rounded border border-amber-200 inline-block mt-0.5">
+                                Giảm {discountPercent}%
+                              </div>
+                            )}
+                          </div>
                         )}
                       </td>
 
                       {/* Debt */}
                       <td className={`whitespace-nowrap ${isCompactView ? 'px-2 py-1.5 text-xs' : 'px-3 py-3.5'}`}>
-                        {student.tuitionWaived ? (
+                        {discountPercent === 100 ? (
                           <span className="text-slate-400 text-xs font-medium">—</span>
                         ) : student.remainingDebt > 0 ? (
                           <div className="flex items-center gap-1.5">
@@ -626,7 +723,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Users className="w-5 h-5 text-indigo-600" />
-                <span>{editingStudent ? 'Chỉnh Sửa Học Sinh' : 'Thêm Học Sinh Mới'}</span>
+                <span>{editingStudent ? 'Chỉnh Sửa Học Sinh' : 'Thêm Học Sinh Mới (Khối 6-9)'}</span>
               </h2>
               <button
                 onClick={() => setIsAddModalOpen(false)}
@@ -699,14 +796,81 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                 </div>
               </div>
 
-              {/* Row 2: DOB, Gender, Grade, Class */}
+              {/* Row 2: Status & Leave Date */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block text-slate-700 font-bold text-xs uppercase tracking-wider">
+                    Trạng Thái Học Tập
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border cursor-pointer transition-all ${
+                      formData.status === 'active'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="student_status"
+                        checked={formData.status === 'active'}
+                        onChange={() => setFormData({ ...formData, status: 'active', leaveDate: '' })}
+                        className="sr-only"
+                      />
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>Đang học</span>
+                    </label>
+
+                    <label className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border cursor-pointer transition-all ${
+                      formData.status === 'dropped'
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="student_status"
+                        checked={formData.status === 'dropped'}
+                        onChange={() => setFormData({
+                          ...formData,
+                          status: 'dropped',
+                          leaveDate: formData.leaveDate || new Date().toISOString().split('T')[0],
+                        })}
+                        className="sr-only"
+                      />
+                      <UserX className="w-3.5 h-3.5" />
+                      <span>Nghỉ học</span>
+                    </label>
+                  </div>
+                </div>
+
+                {formData.status === 'dropped' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/80">
+                    <div>
+                      <label className="block text-rose-700 font-bold mb-1 flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Ngày Tháng Năm Nghỉ Học *</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.leaveDate}
+                        onChange={(e) => setFormData({ ...formData, leaveDate: e.target.value })}
+                        required
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-rose-300 text-rose-900 font-semibold focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                      />
+                    </div>
+                    <div className="text-[11px] text-slate-500 flex items-center">
+                      <span>* Học sinh nghỉ học sẽ được lưu ngày nghỉ để thống kê và quyết toán công nợ.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Row 3: Grade (6-9 only), Class, Gender, DOB */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-slate-600 font-medium mb-1">Khối Lớp</label>
+                  <label className="block text-slate-600 font-medium mb-1">Khối Lớp (6-9)</label>
                   <select
                     value={formData.grade}
                     onChange={(e) => {
-                      const newGrade = Number(e.target.value);
+                      const newGrade = Number(e.target.value) as 6 | 7 | 8 | 9;
                       const nextCode = !editingStudent ? generateNextStudentCode(newGrade) : formData.code;
                       setFormData({
                         ...formData,
@@ -717,7 +881,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                     }}
                     className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500 cursor-pointer font-semibold"
                   >
-                    {[6, 7, 8, 9, 10, 11, 12].map((g) => (
+                    {[6, 7, 8, 9].map((g) => (
                       <option key={g} value={g}>
                         Khối {g}
                       </option>
@@ -760,7 +924,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                 </div>
               </div>
 
-              {/* Row 3: School & Address */}
+              {/* Row 4: School & Address */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-600 font-medium mb-1">Trường Đang Học</label>
@@ -785,7 +949,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                 </div>
               </div>
 
-              {/* Row 4: Parent Information */}
+              {/* Row 5: Parent Information */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                 <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Thông Tin Phụ Huynh (Bắt Buộc)
@@ -831,34 +995,19 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                 </div>
               </div>
 
-              {/* Row 5: ĐĂNG KÝ MÔN HỌC & TỰ ĐỘNG TÍNH HỌC PHÍ */}
-              <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100/50 pb-2.5">
+              {/* Row 6: ĐĂNG KÝ MÔN HỌC & TÙY CHỈNH MIỄN GIẢM (%) */}
+              <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-2.5">
                   <div className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
                     <CreditCard className="w-4 h-4 text-indigo-600" />
-                    <span>Đăng Ký Môn Học & Học Phí Hàng Tháng</span>
+                    <span>Đăng Ký Môn Học (Khối {formData.grade})</span>
                   </div>
-                  
-                  {/* Tuition Waive Toggle */}
-                  <label className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={formData.tuitionWaived}
-                      onChange={(e) => setFormData({ ...formData, tuitionWaived: e.target.checked })}
-                      className="rounded text-rose-600 focus:ring-0 cursor-pointer"
-                    />
-                    <span className="text-[11px] font-bold">Miễn 100% học phí</span>
-                  </label>
-                  
-                  <div className="text-xs font-bold text-indigo-700 font-mono">
-                    {formData.tuitionWaived ? (
-                      <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">MIỄN HỌC PHÍ (0 ₫)</span>
-                    ) : (
-                      <span>Tổng: {formatCurrency(totalFormFee)} / tháng</span>
-                    )}
+                  <div className="text-xs text-slate-500 font-medium">
+                    Chọn môn học học sinh tham gia học
                   </div>
                 </div>
 
+                {/* Subject Selector */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {subjects.map((sub) => {
                     const isChecked = formData.enrolledSubjectIds.includes(sub.id);
@@ -867,7 +1016,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                         key={sub.id}
                         className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-all ${
                           isChecked
-                            ? 'bg-indigo-600 text-white font-semibold border-indigo-600'
+                            ? 'bg-indigo-600 text-white font-semibold border-indigo-600 shadow-2xs'
                             : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                         }`}
                       >
@@ -900,12 +1049,13 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                   })}
                 </div>
 
-                {formData.enrolledSubjectIds.length > 0 && !formData.tuitionWaived && (
-                  <div className="mt-3 bg-white p-3.5 rounded-lg border border-indigo-100 space-y-2">
+                {/* Custom Subject Fees if needed */}
+                {formData.enrolledSubjectIds.length > 0 && (
+                  <div className="bg-white p-3.5 rounded-lg border border-indigo-100 space-y-2">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
                       Tùy chỉnh số tiền học phí cho từng môn học đã chọn:
                     </span>
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
                       {formData.enrolledSubjectIds.map((subId) => {
                         const sub = subjects.find((s) => s.id === subId);
                         if (!sub) return null;
@@ -966,6 +1116,101 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                     </div>
                   </div>
                 )}
+
+                {/* TUITION DISCOUNT PERCENTAGE CONFIGURATION */}
+                <div className="p-3.5 rounded-xl bg-white border border-amber-200 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 uppercase tracking-wider">
+                      <Percent className="w-4 h-4 text-amber-600" />
+                      <span>Miễn Giảm Học Phí Tùy Chỉnh Theo Tỉ Lệ Phần Trăm (%)</span>
+                    </div>
+                    <span className="text-xs font-bold font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                      {formData.tuitionDiscountPercent}%
+                    </span>
+                  </div>
+
+                  {/* Preset Percent Buttons & Number Input */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { percent: 0, label: '0% (Không giảm)' },
+                      { percent: 10, label: '10%' },
+                      { percent: 20, label: '20%' },
+                      { percent: 30, label: '30%' },
+                      { percent: 50, label: '50%' },
+                      { percent: 100, label: '100% (Miễn Toàn Bộ)' },
+                    ].map((btn) => (
+                      <button
+                        key={btn.percent}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, tuitionDiscountPercent: btn.percent })}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          formData.tuitionDiscountPercent === btn.percent
+                            ? 'bg-amber-600 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-700 hover:bg-amber-100 hover:text-amber-800'
+                        }`}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Manual percent input & slider */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center pt-1 border-t border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-medium text-slate-600 shrink-0">Tỉ lệ tùy chỉnh:</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={formData.tuitionDiscountPercent}
+                        onChange={(e) => {
+                          const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
+                          setFormData({ ...formData, tuitionDiscountPercent: val });
+                        }}
+                        className="w-20 px-2 py-1 rounded border border-slate-300 font-mono font-bold text-center text-xs focus:border-amber-500"
+                      />
+                      <span className="text-xs font-bold text-slate-500">%</span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={formData.tuitionDiscountPercent}
+                      onChange={(e) => setFormData({ ...formData, tuitionDiscountPercent: Number(e.target.value) })}
+                      className="w-full accent-amber-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Calculation summary box */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Tổng học phí gốc ({formData.enrolledSubjectIds.length} môn):</span>
+                      <span className="font-mono font-semibold">{formatCurrency(grossFormFee)} / tháng</span>
+                    </div>
+
+                    {formData.tuitionDiscountPercent > 0 && (
+                      <div className="flex items-center justify-between text-rose-600 font-medium">
+                        <span>Miễn giảm ({formData.tuitionDiscountPercent}%):</span>
+                        <span className="font-mono font-semibold">-{formatCurrency(discountAmount)} / tháng</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200 font-bold text-slate-900 text-sm">
+                      <span>Học phí thực thu hàng tháng:</span>
+                      <span className="font-mono text-indigo-700">
+                        {formData.tuitionDiscountPercent === 100 ? (
+                          <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-xs">
+                            MIỄN 100% (0 ₫)
+                          </span>
+                        ) : (
+                          `${formatCurrency(netFormFee)} / tháng`
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Notes */}
@@ -1007,12 +1252,25 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-xl text-slate-800">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white font-extrabold flex items-center justify-center text-lg shadow-xs">
+                <div className={`w-12 h-12 rounded-xl text-white font-extrabold flex items-center justify-center text-lg shadow-xs ${
+                  viewingStudent.status === 'dropped' ? 'bg-slate-400' : 'bg-indigo-600'
+                }`}>
                   {viewingStudent.fullName.split(' ').pop()?.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">{viewingStudent.fullName}</h2>
-                  <div className="text-xs text-slate-500 font-mono">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-900">{viewingStudent.fullName}</h2>
+                    {viewingStudent.status === 'dropped' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                        Nghỉ học {viewingStudent.leaveDate ? `(${viewingStudent.leaveDate})` : ''}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Đang học
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 font-mono mt-0.5">
                     Mã: {viewingStudent.code} • Khối {viewingStudent.grade} ({viewingStudent.className})
                   </div>
                 </div>
@@ -1041,6 +1299,11 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                 <div><strong>Số điện thoại:</strong> {viewingStudent.parentPhone}</div>
                 <div><strong>Zalo:</strong> {viewingStudent.zalo || viewingStudent.parentPhone}</div>
                 <div><strong>Ngày nhập học:</strong> {viewingStudent.joinedDate}</div>
+                {viewingStudent.status === 'dropped' && (
+                  <div className="text-rose-700 font-semibold">
+                    <strong>Ngày nghỉ học:</strong> {viewingStudent.leaveDate || 'Chưa xác định'}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1048,13 +1311,22 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Môn Đăng Ký & Học Phí
+                  Môn Đăng Ký & Học Phí Thực Thu
                 </span>
                 <span className="text-sm font-bold text-emerald-600">
-                  {viewingStudent.tuitionWaived ? (
-                    <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-xs">MIỄN HỌC PHÍ 100%</span>
+                  {viewingStudent.tuitionWaived || (viewingStudent.tuitionDiscountPercent === 100) ? (
+                    <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-xs">
+                      MIỄN HỌC PHÍ 100% (0 ₫)
+                    </span>
                   ) : (
-                    <span>{formatCurrency(viewingStudent.totalTuitionDue)}/tháng</span>
+                    <div className="text-right">
+                      <span>{formatCurrency(viewingStudent.totalTuitionDue)}/tháng</span>
+                      {viewingStudent.tuitionDiscountPercent ? (
+                        <div className="text-[10px] text-amber-700 font-semibold">
+                          (Đã giảm {viewingStudent.tuitionDiscountPercent}%)
+                        </div>
+                      ) : null}
+                    </div>
                   )}
                 </span>
               </div>
@@ -1067,7 +1339,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                   >
                     <span className="font-semibold text-slate-800">{en.subjectName}</span>
                     <span className="font-mono text-slate-600">
-                      {viewingStudent.tuitionWaived ? 'Được miễn (0 ₫)' : formatCurrency(en.finalFee)}
+                      {formatCurrency(en.finalFee)}
                     </span>
                   </div>
                 ))}
@@ -1075,7 +1347,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
 
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
                 <span>Đã nộp: <strong className="text-emerald-600">{formatCurrency(viewingStudent.totalPaid)}</strong></span>
-                <span>Công nợ còn lại: <strong className="text-rose-600">{viewingStudent.tuitionWaived ? '0 ₫' : formatCurrency(viewingStudent.remainingDebt)}</strong></span>
+                <span>Công nợ còn lại: <strong className="text-rose-600">{formatCurrency(viewingStudent.remainingDebt)}</strong></span>
               </div>
             </div>
 
