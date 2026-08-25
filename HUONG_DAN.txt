@@ -22,12 +22,14 @@ B. CÁCH KHỞI CHẠY TRỰC TIẾP (Cực kỳ đơn giản)
    - Trên macOS/Linux: Chạy lệnh "./chay_he_thong.sh" trong Terminal.
    Hệ thống sẽ tự động cài đặt thư viện, build giao diện và mở trình duyệt tại http://localhost:3000.
 
-👉 CÁCH 2: DÙNG LỆNH TRỰC TIẾP (KHUYÊN DÙNG NẾU MUỐN CHẠY DEV):
+👉 CÁCH 2: DÙNG LỆNH TRỰC TIẾP NODE.JS:
    1. Mở Terminal / CMD tại thư mục dự án.
-   2. Chạy lệnh:
+   2. Chạy lệnh cài đặt (lần đầu):
       npm install
-      npm run dev
-   3. Mở trình duyệt và truy cập: http://localhost:3000
+   3. Chạy trực tiếp bằng Node:
+      node app.js
+      (hoặc lệnh dev: npm run dev)
+   4. Mở trình duyệt và truy cập: http://localhost:3000
 
 -----------------------------------------------------------------------
 C. XỬ LÝ KHI GẶP MÀN HÌNH TRẮNG TRÊN LOCALHOST:3000
