@@ -1,0 +1,28 @@
+# =======================================================================
+# CAU HINH VIETTEL WEB HOSTING / CPANEL / CLOUDLINUX NODE.JS
+# =======================================================================
+# File nay duoc su dung khi deploy ung dung AN TAM EDUCATION len
+# Viettel Web Hosting (cPanel / DirectAdmin / Apache / LiteSpeed).
+
+<IfModule mod_passenger.c>
+  PassengerEnabled On
+  PassengerAppType node
+  PassengerStartupFile app.js
+  PassengerNodejs /usr/local/bin/node
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Neu hosting dung Reverse Proxy sang cong noi bo:
+  # RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]
+
+  # Phuc vu truc tiep file tinh neu ton tai
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Fallback ve index.html cho ung dung Single Page Application (SPA)
+  RewriteRule ^ index.html [L]
+</IfModule>

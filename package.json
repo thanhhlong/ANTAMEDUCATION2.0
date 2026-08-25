@@ -3,10 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "app.js",
+  "engines": {
+    "node": ">=20.0.0 || >=22.0.0"
+  },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
-    "start": "tsx server.ts",
+    "start": "node app.js",
     "serve": "node app.js",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

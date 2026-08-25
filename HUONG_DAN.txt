@@ -53,13 +53,25 @@ Hệ thống tích hợp sẵn các trợ lý AI thông minh (Gia sư AI, Tạo 
 4. Lưu file lại và khởi động lại chương trình.
 
 -----------------------------------------------------------------------
-D. THƯ MỤC CHƯƠNG TRÌNH BAO GỒM
+E. HƯỚNG DẪN ĐƯA LÊN VIETTEL WEB HOSTING / TÊN MIỀN RIÊNG
 -----------------------------------------------------------------------
-- \dist            : Thư mục chứa mã nguồn tĩnh đã được biên dịch tối ưu (HTML/CSS/JS).
+Xem tài liệu chi tiết tại file: HUONG_DAN_DEPLOY_VIETTEL_HOSTING.md
+Các bước vắn tắt:
+1. Chạy 'npm run build' để tạo thư mục dist/
+2. Nén mã nguồn tải lên Viettel Hosting (cPanel / DirectAdmin)
+3. Vào 'Setup Node.js App' -> Chọn Node.js 22 (hoặc 20) -> Startup file: app.js
+4. Thêm biến môi trường: GEMINI_API_KEY và NODE_ENV=production
+5. Nhấn 'Run NPM Install' và khởi chạy 'Start Application'
+
+-----------------------------------------------------------------------
+F. THƯ MỤC CHƯƠNG TRÌNH BAO GỒM
+-----------------------------------------------------------------------
+- app.js           : Máy chủ Node.js/Express Production chạy trực tiếp trên Hosting & Local.
+- \dist            : Thư mục chứa giao diện React + Vite đã biên dịch tối ưu.
 - \src             : Toàn bộ mã nguồn phát triển (React + TypeScript).
-- package.json     : Tệp cấu hình thư viện hệ thống.
-- server.ts        : Máy chủ Backend Express.js nội bộ phục vụ routing và tích hợp API.
-- chay_he_thong.*  : Các tệp thực thi khởi chạy tự động nhanh chỉ với 1 click.
+- package.json     : Tệp cấu hình thư viện hệ thống và Node engines.
+- .htaccess        : Cấu hình điều hướng cho Viettel Hosting / cPanel.
+- chay_he_thong.*  : Các tệp thực thi khởi chạy tự động nhanh trên máy tính.
 
 =======================================================================
 Mọi thắc mắc và hỗ trợ kỹ thuật, xin chân thành cảm ơn bạn đã lựa chọn sử dụng 
