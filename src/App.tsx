@@ -25,6 +25,7 @@ import { PublicRegistrationForm } from './components/public/PublicRegistrationFo
 import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileModal } from './components/auth/UserProfileModal';
 import { LoginPage } from './components/auth/LoginPage';
+import { DatabaseManagerModal } from './components/common/DatabaseManagerModal';
 import { generateCenterExcelExport, generateSampleExcelWorkbook } from './utils/excelParser';
 
 const MainAppContent: React.FC = () => {
@@ -41,6 +42,8 @@ const MainAppContent: React.FC = () => {
     setIsAuthModalOpen,
     isLoginPageView,
     setIsLoginPageView,
+    isDatabaseModalOpen,
+    setIsDatabaseModalOpen,
     globalToast,
     hideGlobalToast,
   } = useApp();
@@ -247,6 +250,13 @@ const MainAppContent: React.FC = () => {
           isOpen={isProfileModalOpen}
           onClose={() => setIsProfileModalOpen(false)}
           onOpenLoginModal={() => setIsAuthModalOpen(true)}
+        />
+      )}
+
+      {isDatabaseModalOpen && (
+        <DatabaseManagerModal
+          isOpen={isDatabaseModalOpen}
+          onClose={() => setIsDatabaseModalOpen(false)}
         />
       )}
 

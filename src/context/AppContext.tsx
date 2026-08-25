@@ -39,7 +39,7 @@ import {
 } from '../data/initialData';
 import { ExcelImportResult } from '../utils/excelParser';
 import { cleanAndNormalizeAllData } from '../utils/dataCleaner';
-import { seedIfEmpty, saveDocument, deleteDocument, saveAllCollectionsToFirestore } from '../services/firebase';
+import { seedIfEmpty, saveDocument, deleteDocument, saveAllCollectionsToFirestore, fetchAllCollectionsFromFirestore } from '../services/firebase';
 
 interface AppContextType {
   // Authentication & Session
@@ -50,6 +50,8 @@ interface AppContextType {
   setIsAuthModalOpen: (open: boolean) => void;
   isLoginPageView: boolean;
   setIsLoginPageView: (show: boolean) => void;
+  isDatabaseModalOpen: boolean;
+  setIsDatabaseModalOpen: (open: boolean) => void;
   login: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string }>;
   loginUser: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string }>;
   quickLoginAsRole: (role: UserRole) => void;
@@ -82,6 +84,9 @@ interface AppContextType {
   lastSavedTimestamp: string | null;
   hasUnsavedChanges: boolean;
   saveAllToDatabase: (notify?: boolean) => Promise<{ success: boolean; message?: string; totalSaved?: number; timestamp?: string }>;
+  exportJsonBackup: () => void;
+  importJsonBackup: (jsonStr: string) => Promise<{ success: boolean; message?: string; count?: number }>;
+  syncFromCloud: () => Promise<{ success: boolean; message?: string; count?: number }>;
   globalToast: { message: string; type: 'success' | 'info' | 'error' } | null;
   showGlobalToast: (message: string, type?: 'success' | 'info' | 'error') => void;
   hideGlobalToast: () => void;
@@ -177,6 +182,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isLoginPageView, setIsLoginPageView] = useState<boolean>(false);
+  const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState<boolean>(false);
 
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
     return currentUser ? currentUser.role : 'SUPER_ADMIN';
@@ -305,58 +311,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentUser]);
 
-  // One-time Cloud Sync & Seeding on Mount
+  // One-time Cloud Sync & Safe Seeding on Mount
   useEffect(() => {
     async function loadCloudData() {
       try {
         console.log('Connecting to Firebase Firestore...');
-        
-        const seededUsers = await seedIfEmpty('users', users);
-        setUsers(seededUsers);
+        const hasSavedLocal = localStorage.getItem(`${STORAGE_KEY}_has_saved`);
 
-        const seededStudents = await seedIfEmpty('students', students);
-        setStudents(seededStudents);
-
-        const seededSubjects = await seedIfEmpty('subjects', subjects);
-        setSubjects(seededSubjects);
-
-        const seededTuitionPlans = await seedIfEmpty('tuitionPlans', tuitionPlans);
-        setTuitionPlans(seededTuitionPlans);
-
-        const seededInvoices = await seedIfEmpty('invoices', invoices);
-        setInvoices(seededInvoices);
-
-        const seededExpenses = await seedIfEmpty('expenses', expenses);
-        setExpenses(seededExpenses);
-
-        const seededLeads = await seedIfEmpty('leads', leads);
-        setLeads(seededLeads);
-
-        const seededTutors = await seedIfEmpty('tutors', tutors);
-        setTutors(seededTutors);
-
-        const seededClasses = await seedIfEmpty('classes', classes);
-        setClasses(seededClasses);
-
-        const seededScheduleSessions = await seedIfEmpty('scheduleSessions', scheduleSessions);
-        setScheduleSessions(seededScheduleSessions);
-
-        const seededAttendance = await seedIfEmpty('attendance', attendance);
-        setAttendance(seededAttendance);
-
-        const seededLessons = await seedIfEmpty('lessons', lessons);
-        setLessons(seededLessons);
-
-        const seededAssignments = await seedIfEmpty('assignments', assignments);
-        setAssignments(seededAssignments);
-
-        const seededSubmissions = await seedIfEmpty('submissions', submissions);
-        setSubmissions(seededSubmissions);
-
+        // If local user has never saved data on this browser, attempt to hydrate from Cloud
+        if (!hasSavedLocal) {
+          const cloudData = await fetchAllCollectionsFromFirestore();
+          if (cloudData) {
+            if (cloudData.users && cloudData.users.length > 0) setUsers(cloudData.users);
+            if (cloudData.students && cloudData.students.length > 0) setStudents(cloudData.students);
+            if (cloudData.subjects && cloudData.subjects.length > 0) setSubjects(cloudData.subjects);
+            if (cloudData.tuitionPlans && cloudData.tuitionPlans.length > 0) setTuitionPlans(cloudData.tuitionPlans);
+            if (cloudData.invoices && cloudData.invoices.length > 0) setInvoices(cloudData.invoices);
+            if (cloudData.expenses && cloudData.expenses.length > 0) setExpenses(cloudData.expenses);
+            if (cloudData.leads && cloudData.leads.length > 0) setLeads(cloudData.leads);
+            if (cloudData.tutors && cloudData.tutors.length > 0) setTutors(cloudData.tutors);
+            if (cloudData.classes && cloudData.classes.length > 0) setClasses(cloudData.classes);
+            if (cloudData.scheduleSessions && cloudData.scheduleSessions.length > 0) setScheduleSessions(cloudData.scheduleSessions);
+            if (cloudData.attendance && cloudData.attendance.length > 0) setAttendance(cloudData.attendance);
+            if (cloudData.lessons && cloudData.lessons.length > 0) setLessons(cloudData.lessons);
+            if (cloudData.assignments && cloudData.assignments.length > 0) setAssignments(cloudData.assignments);
+            if (cloudData.submissions && cloudData.submissions.length > 0) setSubmissions(cloudData.submissions);
+          } else {
+            // Firestore is totally empty, seed Firestore with initial data
+            await seedIfEmpty('users', users);
+            await seedIfEmpty('students', students);
+            await seedIfEmpty('subjects', subjects);
+            await seedIfEmpty('tuitionPlans', tuitionPlans);
+            await seedIfEmpty('invoices', invoices);
+            await seedIfEmpty('expenses', expenses);
+            await seedIfEmpty('leads', leads);
+            await seedIfEmpty('tutors', tutors);
+            await seedIfEmpty('classes', classes);
+            await seedIfEmpty('scheduleSessions', scheduleSessions);
+            await seedIfEmpty('attendance', attendance);
+            await seedIfEmpty('lessons', lessons);
+            await seedIfEmpty('assignments', assignments);
+            await seedIfEmpty('submissions', submissions);
+          }
+        }
         setIsFirebaseConnected(true);
-        console.log('Firebase Firestore successfully loaded & synced!');
+        console.log('Firebase Firestore connection verified.');
       } catch (err) {
-        console.error('Firebase connection failed, running in local-only fallback mode:', err);
+        console.warn('Firebase Firestore notice (offline-first fallback active):', err);
         setIsFirebaseConnected(false);
       } finally {
         setIsLoadingFromCloud(false);
@@ -366,199 +367,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadCloudData();
   }, []);
 
-  // Real-time Cloud Background Synchronizers
-  const prevUsers = useRef<AuthUser[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevUsers.current = users;
-      return;
-    }
-    const changed = users.filter(u => !prevUsers.current.some(pu => pu.id === u.id && JSON.stringify(pu) === JSON.stringify(u)));
-    const deleted = prevUsers.current.filter(pu => !users.some(u => u.id === pu.id));
-    changed.forEach(u => saveDocument('users', u.id, u));
-    deleted.forEach(pu => deleteDocument('users', pu.id));
-    prevUsers.current = users;
-  }, [users, isLoadingFromCloud]);
-
-  const prevStudents = useRef<Student[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevStudents.current = students;
-      return;
-    }
-    const changed = students.filter(s => !prevStudents.current.some(ps => ps.id === s.id && JSON.stringify(ps) === JSON.stringify(s)));
-    const deleted = prevStudents.current.filter(ps => !students.some(s => s.id === ps.id));
-    changed.forEach(s => saveDocument('students', s.id, s));
-    deleted.forEach(ps => deleteDocument('students', ps.id));
-    prevStudents.current = students;
-  }, [students, isLoadingFromCloud]);
-
-  const prevSubjects = useRef<Subject[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevSubjects.current = subjects;
-      return;
-    }
-    const changed = subjects.filter(s => !prevSubjects.current.some(ps => ps.id === s.id && JSON.stringify(ps) === JSON.stringify(s)));
-    const deleted = prevSubjects.current.filter(ps => !subjects.some(s => s.id === ps.id));
-    changed.forEach(s => saveDocument('subjects', s.id, s));
-    deleted.forEach(ps => deleteDocument('subjects', ps.id));
-    prevSubjects.current = subjects;
-  }, [subjects, isLoadingFromCloud]);
-
-  const prevTuitionPlans = useRef<TuitionPlan[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevTuitionPlans.current = tuitionPlans;
-      return;
-    }
-    const changed = tuitionPlans.filter(t => !prevTuitionPlans.current.some(pt => pt.id === t.id && JSON.stringify(pt) === JSON.stringify(t)));
-    const deleted = prevTuitionPlans.current.filter(pt => !tuitionPlans.some(t => t.id === pt.id));
-    changed.forEach(t => saveDocument('tuitionPlans', t.id, t));
-    deleted.forEach(pt => deleteDocument('tuitionPlans', pt.id));
-    prevTuitionPlans.current = tuitionPlans;
-  }, [tuitionPlans, isLoadingFromCloud]);
-
-  const prevInvoices = useRef<InvoiceRecord[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevInvoices.current = invoices;
-      return;
-    }
-    const changed = invoices.filter(i => !prevInvoices.current.some(pi => pi.id === i.id && JSON.stringify(pi) === JSON.stringify(i)));
-    const deleted = prevInvoices.current.filter(pi => !invoices.some(i => i.id === pi.id));
-    changed.forEach(i => saveDocument('invoices', i.id, i));
-    deleted.forEach(pi => deleteDocument('invoices', pi.id));
-    prevInvoices.current = invoices;
-  }, [invoices, isLoadingFromCloud]);
-
-  const prevExpenses = useRef<ExpenseItem[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevExpenses.current = expenses;
-      return;
-    }
-    const changed = expenses.filter(e => !prevExpenses.current.some(pe => pe.id === e.id && JSON.stringify(pe) === JSON.stringify(e)));
-    const deleted = prevExpenses.current.filter(pe => !expenses.some(e => e.id === pe.id));
-    changed.forEach(e => saveDocument('expenses', e.id, e));
-    deleted.forEach(pe => deleteDocument('expenses', pe.id));
-    prevExpenses.current = expenses;
-  }, [expenses, isLoadingFromCloud]);
-
-  const prevLeads = useRef<ParentLead[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevLeads.current = leads;
-      return;
-    }
-    const changed = leads.filter(l => !prevLeads.current.some(pl => pl.id === l.id && JSON.stringify(pl) === JSON.stringify(l)));
-    const deleted = prevLeads.current.filter(pl => !leads.some(l => l.id === pl.id));
-    changed.forEach(l => saveDocument('leads', l.id, l));
-    deleted.forEach(pl => deleteDocument('leads', pl.id));
-    prevLeads.current = leads;
-  }, [leads, isLoadingFromCloud]);
-
-  const prevTutors = useRef<TutorAssistant[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevTutors.current = tutors;
-      return;
-    }
-    const changed = tutors.filter(t => !prevTutors.current.some(pt => pt.id === t.id && JSON.stringify(pt) === JSON.stringify(t)));
-    const deleted = prevTutors.current.filter(pt => !tutors.some(t => t.id === pt.id));
-    changed.forEach(t => saveDocument('tutors', t.id, t));
-    deleted.forEach(pt => deleteDocument('tutors', pt.id));
-    prevTutors.current = tutors;
-  }, [tutors, isLoadingFromCloud]);
-
-  const prevClasses = useRef<ClassGroup[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevClasses.current = classes;
-      return;
-    }
-    const changed = classes.filter(c => !prevClasses.current.some(pc => pc.id === c.id && JSON.stringify(pc) === JSON.stringify(c)));
-    const deleted = prevClasses.current.filter(pc => !classes.some(c => c.id === pc.id));
-    changed.forEach(c => saveDocument('classes', c.id, c));
-    deleted.forEach(pc => deleteDocument('classes', pc.id));
-    prevClasses.current = classes;
-  }, [classes, isLoadingFromCloud]);
-
-  const prevScheduleSessions = useRef<ScheduleSession[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevScheduleSessions.current = scheduleSessions;
-      return;
-    }
-    const changed = scheduleSessions.filter(s => !prevScheduleSessions.current.some(ps => ps.id === s.id && JSON.stringify(ps) === JSON.stringify(s)));
-    const deleted = prevScheduleSessions.current.filter(ps => !scheduleSessions.some(s => s.id === ps.id));
-    changed.forEach(s => saveDocument('scheduleSessions', s.id, s));
-    deleted.forEach(ps => deleteDocument('scheduleSessions', ps.id));
-    prevScheduleSessions.current = scheduleSessions;
-  }, [scheduleSessions, isLoadingFromCloud]);
-
-  const prevAttendance = useRef<StudentAttendance[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevAttendance.current = attendance;
-      return;
-    }
-    const changed = attendance.filter(a => !prevAttendance.current.some(pa => pa.id === a.id && JSON.stringify(pa) === JSON.stringify(a)));
-    const deleted = prevAttendance.current.filter(pa => !attendance.some(a => a.id === pa.id));
-    changed.forEach(a => saveDocument('attendance', a.id, a));
-    deleted.forEach(pa => deleteDocument('attendance', pa.id));
-    prevAttendance.current = attendance;
-  }, [attendance, isLoadingFromCloud]);
-
-  const prevLessons = useRef<LMSLesson[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevLessons.current = lessons;
-      return;
-    }
-    const changed = lessons.filter(l => !prevLessons.current.some(pl => pl.id === l.id && JSON.stringify(pl) === JSON.stringify(l)));
-    const deleted = prevLessons.current.filter(pl => !lessons.some(l => l.id === pl.id));
-    changed.forEach(l => saveDocument('lessons', l.id, l));
-    deleted.forEach(pl => deleteDocument('lessons', pl.id));
-    prevLessons.current = lessons;
-  }, [lessons, isLoadingFromCloud]);
-
-  const prevAssignments = useRef<LMSAssignment[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevAssignments.current = assignments;
-      return;
-    }
-    const changed = assignments.filter(a => !prevAssignments.current.some(pa => pa.id === a.id && JSON.stringify(pa) === JSON.stringify(a)));
-    const deleted = prevAssignments.current.filter(pa => !assignments.some(a => a.id === pa.id));
-    changed.forEach(a => saveDocument('assignments', a.id, a));
-    deleted.forEach(pa => deleteDocument('assignments', pa.id));
-    prevAssignments.current = assignments;
-  }, [assignments, isLoadingFromCloud]);
-
-  const prevSubmissions = useRef<LMSSubmission[]>([]);
-  useEffect(() => {
-    if (isLoadingFromCloud) {
-      prevSubmissions.current = submissions;
-      return;
-    }
-    const changed = submissions.filter(s => !prevSubmissions.current.some(ps => ps.id === s.id && JSON.stringify(ps) === JSON.stringify(s)));
-    const deleted = prevSubmissions.current.filter(ps => !submissions.some(s => s.id === ps.id));
-    changed.forEach(s => saveDocument('submissions', s.id, s));
-    deleted.forEach(ps => deleteDocument('submissions', ps.id));
-    prevSubmissions.current = submissions;
-  }, [submissions, isLoadingFromCloud]);
-
   /**
-   * Explicit Manual Save to Cloud Firestore Database
+   * Explicit Manual Save to Cloud Firestore Database + LocalStorage
    */
   const saveAllToDatabase = async (
     notify: boolean = true
   ): Promise<{ success: boolean; message?: string; totalSaved?: number; timestamp?: string }> => {
     setIsSavingToDatabase(true);
     try {
-      const result = await saveAllCollectionsToFirestore({
-        users,
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')} - ${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+
+      // 1. Immediately persist to LocalStorage with timestamp & flag
+      localStorage.setItem(`${STORAGE_KEY}_has_saved`, 'true');
+      localStorage.setItem(`${STORAGE_KEY}_last_saved_time`, timeStr);
+      localStorage.setItem(`${STORAGE_KEY}_students`, JSON.stringify(students));
+      localStorage.setItem(`${STORAGE_KEY}_subjects`, JSON.stringify(subjects));
+      localStorage.setItem(`${STORAGE_KEY}_tuitionPlans`, JSON.stringify(tuitionPlans));
+      localStorage.setItem(`${STORAGE_KEY}_invoices`, JSON.stringify(invoices));
+      localStorage.setItem(`${STORAGE_KEY}_expenses`, JSON.stringify(expenses));
+      localStorage.setItem(`${STORAGE_KEY}_leads`, JSON.stringify(leads));
+      localStorage.setItem(`${STORAGE_KEY}_tutors`, JSON.stringify(tutors));
+      localStorage.setItem(`${STORAGE_KEY}_classes`, JSON.stringify(classes));
+      localStorage.setItem(`${STORAGE_KEY}_scheduleSessions`, JSON.stringify(scheduleSessions));
+      localStorage.setItem(`${STORAGE_KEY}_attendance`, JSON.stringify(attendance));
+      localStorage.setItem(`${STORAGE_KEY}_lessons`, JSON.stringify(lessons));
+      localStorage.setItem(`${STORAGE_KEY}_assignments`, JSON.stringify(assignments));
+      localStorage.setItem(`${STORAGE_KEY}_submissions`, JSON.stringify(submissions));
+      localStorage.setItem(`${STORAGE_KEY}_users`, JSON.stringify(users));
+
+      // LocalStorage full snapshot
+      const fullSnapshot = {
+        savedAt: timeStr,
         students,
         subjects,
         tuitionPlans,
@@ -572,15 +412,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lessons,
         assignments,
         submissions,
-      });
+        users,
+      };
+      localStorage.setItem(`${STORAGE_KEY}_backup_snapshot`, JSON.stringify(fullSnapshot));
 
-      const timeStr = result.timestamp;
+      let totalSaved =
+        students.length +
+        invoices.length +
+        expenses.length +
+        leads.length +
+        tutors.length +
+        classes.length +
+        scheduleSessions.length +
+        attendance.length +
+        lessons.length +
+        assignments.length +
+        submissions.length +
+        users.length;
+
+      // 2. Synchronize to Firestore
+      try {
+        const result = await saveAllCollectionsToFirestore({
+          users,
+          students,
+          subjects,
+          tuitionPlans,
+          invoices,
+          expenses,
+          leads,
+          tutors,
+          classes,
+          scheduleSessions,
+          attendance,
+          lessons,
+          assignments,
+          submissions,
+        });
+        totalSaved = result.totalSaved;
+        setIsFirebaseConnected(true);
+      } catch (cloudErr) {
+        console.warn('Could not push to Cloud, saved to LocalStorage successfully:', cloudErr);
+      }
+
       setLastSavedTimestamp(timeStr);
-      localStorage.setItem(`${STORAGE_KEY}_last_saved_time`, timeStr);
       setHasUnsavedChanges(false);
-      setIsFirebaseConnected(true);
 
-      const successMsg = `Đã lưu toàn bộ dữ liệu (${result.totalSaved} bản ghi / ${result.collectionsSaved} bảng) lên Firebase Database thành công!`;
+      const successMsg = `Đã lưu toàn bộ dữ liệu (${totalSaved} bản ghi) vào hệ thống & Đám mây thành công!`;
       if (notify) {
         showGlobalToast(successMsg, 'success');
       }
@@ -588,12 +465,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return {
         success: true,
         message: successMsg,
-        totalSaved: result.totalSaved,
+        totalSaved,
         timestamp: timeStr,
       };
     } catch (error: any) {
-      console.error('Lỗi khi lưu dữ liệu lên database:', error);
-      const errMsg = error?.message || 'Không thể lưu lên cơ sở dữ liệu. Vui lòng kiểm tra kết nối mạng.';
+      console.error('Lỗi khi lưu dữ liệu:', error);
+      const errMsg = error?.message || 'Không thể lưu dữ liệu.';
       if (notify) {
         showGlobalToast(`Lưu dữ liệu thất bại: ${errMsg}`, 'error');
       }
@@ -603,6 +480,108 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     } finally {
       setIsSavingToDatabase(false);
+    }
+  };
+
+  const exportJsonBackup = () => {
+    const data = {
+      app: 'AN_TAM_EDUCATION',
+      version: '3.0',
+      exportedAt: new Date().toISOString(),
+      students,
+      subjects,
+      tuitionPlans,
+      invoices,
+      expenses,
+      leads,
+      tutors,
+      classes,
+      scheduleSessions,
+      attendance,
+      lessons,
+      assignments,
+      submissions,
+      users,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `antam_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showGlobalToast('Đã tải tệp sao lưu JSON về máy tính!', 'success');
+  };
+
+  const importJsonBackup = async (jsonString: string): Promise<{ success: boolean; message?: string; count?: number }> => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (!parsed || typeof parsed !== 'object') {
+        return { success: false, message: 'Dữ liệu JSON không đúng định dạng.' };
+      }
+
+      if (Array.isArray(parsed.students)) setStudents(parsed.students);
+      if (Array.isArray(parsed.subjects)) setSubjects(parsed.subjects);
+      if (Array.isArray(parsed.tuitionPlans)) setTuitionPlans(parsed.tuitionPlans);
+      if (Array.isArray(parsed.invoices)) setInvoices(parsed.invoices);
+      if (Array.isArray(parsed.expenses)) setExpenses(parsed.expenses);
+      if (Array.isArray(parsed.leads)) setLeads(parsed.leads);
+      if (Array.isArray(parsed.tutors)) setTutors(parsed.tutors);
+      if (Array.isArray(parsed.classes)) setClasses(parsed.classes);
+      if (Array.isArray(parsed.scheduleSessions)) setScheduleSessions(parsed.scheduleSessions);
+      if (Array.isArray(parsed.attendance)) setAttendance(parsed.attendance);
+      if (Array.isArray(parsed.lessons)) setLessons(parsed.lessons);
+      if (Array.isArray(parsed.assignments)) setAssignments(parsed.assignments);
+      if (Array.isArray(parsed.submissions)) setSubmissions(parsed.submissions);
+      if (Array.isArray(parsed.users)) setUsers(parsed.users);
+
+      setTimeout(() => {
+        saveAllToDatabase(false);
+      }, 250);
+
+      const total =
+        (parsed.students?.length || 0) +
+        (parsed.invoices?.length || 0) +
+        (parsed.expenses?.length || 0) +
+        (parsed.leads?.length || 0);
+
+      return { success: true, count: total };
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  const syncFromCloud = async (): Promise<{ success: boolean; message?: string; count?: number }> => {
+    try {
+      const cloudData = await fetchAllCollectionsFromFirestore();
+      if (!cloudData) {
+        return { success: false, message: 'Không tìm thấy dữ liệu trên Đám mây Firebase.' };
+      }
+      if (cloudData.students) setStudents(cloudData.students);
+      if (cloudData.subjects) setSubjects(cloudData.subjects);
+      if (cloudData.tuitionPlans) setTuitionPlans(cloudData.tuitionPlans);
+      if (cloudData.invoices) setInvoices(cloudData.invoices);
+      if (cloudData.expenses) setExpenses(cloudData.expenses);
+      if (cloudData.leads) setLeads(cloudData.leads);
+      if (cloudData.tutors) setTutors(cloudData.tutors);
+      if (cloudData.classes) setClasses(cloudData.classes);
+      if (cloudData.scheduleSessions) setScheduleSessions(cloudData.scheduleSessions);
+      if (cloudData.attendance) setAttendance(cloudData.attendance);
+      if (cloudData.lessons) setLessons(cloudData.lessons);
+      if (cloudData.assignments) setAssignments(cloudData.assignments);
+      if (cloudData.submissions) setSubmissions(cloudData.submissions);
+      if (cloudData.users) setUsers(cloudData.users);
+
+      const count =
+        (cloudData.students?.length || 0) +
+        (cloudData.invoices?.length || 0) +
+        (cloudData.expenses?.length || 0) +
+        (cloudData.leads?.length || 0);
+
+      showGlobalToast(`Đã đồng bộ ${count} bản ghi từ Cloud!`, 'success');
+      return { success: true, count };
+    } catch (err: any) {
+      return { success: false, message: err.message };
     }
   };
 
@@ -1537,6 +1516,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAuthModalOpen,
         isLoginPageView,
         setIsLoginPageView,
+        isDatabaseModalOpen,
+        setIsDatabaseModalOpen,
         login,
         loginUser,
         quickLoginAsRole,
@@ -1604,6 +1585,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastSavedTimestamp,
         hasUnsavedChanges,
         saveAllToDatabase,
+        exportJsonBackup,
+        importJsonBackup,
+        syncFromCloud,
         globalToast,
         showGlobalToast,
         hideGlobalToast,

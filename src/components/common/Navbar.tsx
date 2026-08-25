@@ -15,6 +15,7 @@ import {
   Loader2,
   CheckCircle2,
   CloudUpload,
+  Database,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -48,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     saveAllToDatabase,
     isSavingToDatabase,
     lastSavedTimestamp,
-    isFirebaseConnected,
+    setIsDatabaseModalOpen,
   } = useApp();
 
   const [recentlySaved, setRecentlySaved] = React.useState(false);
@@ -151,40 +152,50 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Zone 3: Actions & User Auth */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Primary Save Data to Database Button */}
-          <button
-            onClick={handleManualSave}
-            disabled={isSavingToDatabase}
-            title={
-              lastSavedTimestamp
-                ? `Đã lưu cơ sở dữ liệu lúc: ${lastSavedTimestamp} (Bấm để cập nhật lại / Phím tắt: Ctrl + S)`
-                : 'Lưu toàn bộ thay đổi lên Firebase Database (Phím tắt: Ctrl + S)'
-            }
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap ${
-              recentlySaved
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : isSavingToDatabase
-                ? 'bg-indigo-400 text-white cursor-wait opacity-90'
-                : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white'
-            }`}
-          >
-            {isSavingToDatabase ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-            ) : recentlySaved ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
-            ) : (
-              <CloudUpload className="w-3.5 h-3.5 shrink-0" />
-            )}
-            <span>
-              {isSavingToDatabase
-                ? 'Đang Lưu...'
-                : recentlySaved
-                ? 'Đã Lưu Xong!'
-                : 'Lưu Dữ Liệu'}
-            </span>
-            <span className="hidden sm:inline-block px-1 py-0.2 bg-white/20 text-white text-[9px] rounded font-mono font-semibold">
-              Ctrl+S
-            </span>
-          </button>
+          <div className="flex items-center rounded-lg shadow-xs overflow-hidden">
+            <button
+              onClick={handleManualSave}
+              disabled={isSavingToDatabase}
+              title={
+                lastSavedTimestamp
+                  ? `Đã lưu cơ sở dữ liệu lúc: ${lastSavedTimestamp} (Bấm để cập nhật lại / Phím tắt: Ctrl + S)`
+                  : 'Lưu toàn bộ thay đổi lên Firebase Database (Phím tắt: Ctrl + S)'
+              }
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                recentlySaved
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : isSavingToDatabase
+                  ? 'bg-indigo-400 text-white cursor-wait opacity-90'
+                  : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white'
+              }`}
+            >
+              {isSavingToDatabase ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              ) : recentlySaved ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+              ) : (
+                <CloudUpload className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span>
+                {isSavingToDatabase
+                  ? 'Đang Lưu...'
+                  : recentlySaved
+                  ? 'Đã Lưu Xong!'
+                  : 'Lưu Dữ Liệu'}
+              </span>
+              <span className="hidden sm:inline-block px-1 py-0.2 bg-white/20 text-white text-[9px] rounded font-mono font-semibold">
+                Ctrl+S
+              </span>
+            </button>
+
+            <button
+              onClick={() => setIsDatabaseModalOpen(true)}
+              title="Mở bảng điều khiển Cơ sở dữ liệu & Sao lưu JSON"
+              className="bg-indigo-700 hover:bg-indigo-800 text-white px-2 py-1.5 border-l border-indigo-500/40 transition-colors cursor-pointer flex items-center justify-center"
+            >
+              <Database className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           <button
             onClick={onOpenPublicForm}

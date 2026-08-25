@@ -24,6 +24,7 @@ import {
   CloudUpload,
   Loader2,
   CheckCircle2,
+  Database,
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -82,6 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     saveAllToDatabase,
     isSavingToDatabase,
     lastSavedTimestamp,
+    setIsDatabaseModalOpen,
   } = useApp();
 
   const [recentlySaved, setRecentlySaved] = React.useState(false);
@@ -362,33 +364,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </p>
             
             {/* Quick Manual Save to Database */}
-            <button
-              type="button"
-              onClick={handleSidebarSave}
-              disabled={isSavingToDatabase}
-              className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
-                recentlySaved
-                  ? 'bg-emerald-600 border-emerald-600 text-white'
-                  : isSavingToDatabase
-                  ? 'bg-indigo-400 border-indigo-400 text-white cursor-wait'
-                  : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 border-indigo-700 text-white'
-              }`}
-            >
-              {isSavingToDatabase ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-              ) : recentlySaved ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
-              ) : (
-                <CloudUpload className="w-3.5 h-3.5 shrink-0" />
-              )}
-              <span className="truncate">
-                {isSavingToDatabase
-                  ? 'Đang lưu Cloud...'
-                  : recentlySaved
-                  ? 'Đã lưu Database!'
-                  : 'Lưu Dữ Liệu (Ctrl+S)'}
-              </span>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleSidebarSave}
+                disabled={isSavingToDatabase}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
+                  recentlySaved
+                    ? 'bg-emerald-600 border-emerald-600 text-white'
+                    : isSavingToDatabase
+                    ? 'bg-indigo-400 border-indigo-400 text-white cursor-wait'
+                    : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 border-indigo-700 text-white'
+                }`}
+              >
+                {isSavingToDatabase ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                ) : recentlySaved ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+                ) : (
+                  <CloudUpload className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span className="truncate">
+                  {isSavingToDatabase
+                    ? 'Đang lưu...'
+                    : recentlySaved
+                    ? 'Đã lưu!'
+                    : 'Lưu Dữ Liệu'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDatabaseModalOpen(true);
+                  onCloseMobile?.();
+                }}
+                title="Quản lý Cơ sở dữ liệu & Sao lưu JSON"
+                className="py-1.5 px-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300 transition-colors flex items-center justify-center cursor-pointer shrink-0"
+              >
+                <Database className="w-3.5 h-3.5" />
+              </button>
+            </div>
             {lastSavedTimestamp && (
               <div className="text-[9px] text-slate-400 text-center truncate">
                 Lưu gần nhất: {lastSavedTimestamp}
