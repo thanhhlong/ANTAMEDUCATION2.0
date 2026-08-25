@@ -21,6 +21,9 @@ import {
   LogOut,
   X,
   Coins,
+  CloudUpload,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -68,7 +71,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen = false,
   onCloseMobile,
 }) => {
-  const { currentRole, leads, invoices, expenses, currentUser, logout, setIsLoginPageView } = useApp();
+  const {
+    currentRole,
+    leads,
+    invoices,
+    expenses,
+    currentUser,
+    logout,
+    setIsLoginPageView,
+    saveAllToDatabase,
+    isSavingToDatabase,
+    lastSavedTimestamp,
+  } = useApp();
+
+  const [recentlySaved, setRecentlySaved] = React.useState(false);
+
+  const handleSidebarSave = async () => {
+    const res = await saveAllToDatabase(true);
+    if (res.success) {
+      setRecentlySaved(true);
+      setTimeout(() => setRecentlySaved(false), 2500);
+    }
+  };
 
   const overdueCount = invoices.filter((i) => i.status === 'overdue').length;
   const newLeadsCount = leads.filter((l) => l.status === 'new' || l.status === 'consulting').length;
@@ -337,6 +361,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
               54/8 Phạm Hồng Thái, Đắk Lắk
             </p>
             
+            {/* Quick Manual Save to Database */}
+            <button
+              type="button"
+              onClick={handleSidebarSave}
+              disabled={isSavingToDatabase}
+              className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
+                recentlySaved
+                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                  : isSavingToDatabase
+                  ? 'bg-indigo-400 border-indigo-400 text-white cursor-wait'
+                  : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 border-indigo-700 text-white'
+              }`}
+            >
+              {isSavingToDatabase ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              ) : recentlySaved ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+              ) : (
+                <CloudUpload className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span className="truncate">
+                {isSavingToDatabase
+                  ? 'Đang lưu Cloud...'
+                  : recentlySaved
+                  ? 'Đã lưu Database!'
+                  : 'Lưu Dữ Liệu (Ctrl+S)'}
+              </span>
+            </button>
+            {lastSavedTimestamp && (
+              <div className="text-[9px] text-slate-400 text-center truncate">
+                Lưu gần nhất: {lastSavedTimestamp}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => {

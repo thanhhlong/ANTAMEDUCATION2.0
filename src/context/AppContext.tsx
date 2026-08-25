@@ -39,7 +39,7 @@ import {
 } from '../data/initialData';
 import { ExcelImportResult } from '../utils/excelParser';
 import { cleanAndNormalizeAllData } from '../utils/dataCleaner';
-import { seedIfEmpty, saveDocument, deleteDocument } from '../services/firebase';
+import { seedIfEmpty, saveDocument, deleteDocument, saveAllCollectionsToFirestore } from '../services/firebase';
 
 interface AppContextType {
   // Authentication & Session
@@ -77,10 +77,20 @@ interface AppContextType {
   assignments: LMSAssignment[];
   submissions: LMSSubmission[];
 
+  // Database Persistence & Manual Save
+  isSavingToDatabase: boolean;
+  lastSavedTimestamp: string | null;
+  hasUnsavedChanges: boolean;
+  saveAllToDatabase: (notify?: boolean) => Promise<{ success: boolean; message?: string; totalSaved?: number; timestamp?: string }>;
+  globalToast: { message: string; type: 'success' | 'info' | 'error' } | null;
+  showGlobalToast: (message: string, type?: 'success' | 'info' | 'error') => void;
+  hideGlobalToast: () => void;
+
   // Student Actions
   addStudent: (student: Omit<Student, 'id' | 'totalTuitionDue' | 'totalPaid' | 'remainingDebt'>) => Student;
   updateStudent: (id: string, updates: Partial<Student>) => void;
   deleteStudent: (id: string) => void;
+  deleteStudents: (ids: string[]) => void;
 
   // Finance Actions
   addPayment: (invoiceId: string, payment: Omit<PaymentTransaction, 'id' | 'invoiceId'>) => void;
@@ -98,6 +108,8 @@ interface AppContextType {
   // Tutor Actions
   addTutor: (tutor: Omit<TutorAssistant, 'id' | 'code' | 'createdAt'>) => void;
   updateTutorStatus: (id: string, status: TutorStatus) => void;
+  deleteTutor: (id: string) => void;
+  deleteTutors: (ids: string[]) => void;
 
   // Schedule & Attendance
   addScheduleSession: (session: Omit<ScheduleSession, 'id'>) => ScheduleSession;
@@ -115,6 +127,7 @@ interface AppContextType {
   addNewUser: (user: Omit<AuthUser, 'id' | 'createdAt'>) => AuthUser;
   updateUser: (id: string, updates: Partial<AuthUser>) => void;
   deleteUser: (id: string) => void;
+  deleteUsers: (ids: string[]) => void;
   toggleUserStatus: (id: string) => void;
 
   // Excel Import & Data Operations
@@ -139,16 +152,28 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'antam_education_app_state_v3';
 
+function safeGet<T>(key: string, defaultValue: T): T {
+  try {
+    const item = localStorage.getItem(key);
+    if (!item || item === 'undefined' || item === 'null') return defaultValue;
+    return JSON.parse(item);
+  } catch (e) {
+    console.warn(`Error reading localStorage for key ${key}:`, e);
+    return defaultValue;
+  }
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoadingFromCloud, setIsLoadingFromCloud] = useState<boolean>(true);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(false);
 
   const [users, setUsers] = useState<AuthUser[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_users`);
-    return saved ? JSON.parse(saved) : INITIAL_AUTH_USERS;
+    return safeGet(`${STORAGE_KEY}_users`, INITIAL_AUTH_USERS);
   });
 
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    return safeGet<AuthUser | null>(`${STORAGE_KEY}_currentUser`, null);
+  });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isLoginPageView, setIsLoginPageView] = useState<boolean>(false);
@@ -159,69 +184,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedGrade, setSelectedGrade] = useState<number | 'all'>('all');
 
   const [students, setStudents] = useState<Student[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_students`);
-    return saved ? JSON.parse(saved) : INITIAL_STUDENTS;
+    return safeGet(`${STORAGE_KEY}_students`, INITIAL_STUDENTS);
   });
 
   const [subjects, setSubjects] = useState<Subject[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_subjects`);
-    return saved ? JSON.parse(saved) : INITIAL_SUBJECTS;
+    return safeGet(`${STORAGE_KEY}_subjects`, INITIAL_SUBJECTS);
   });
 
   const [tuitionPlans, setTuitionPlans] = useState<TuitionPlan[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_tuitionPlans`);
-    return saved ? JSON.parse(saved) : INITIAL_TUITION_PLANS;
+    return safeGet(`${STORAGE_KEY}_tuitionPlans`, INITIAL_TUITION_PLANS);
   });
 
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_invoices`);
-    return saved ? JSON.parse(saved) : INITIAL_INVOICES;
+    return safeGet(`${STORAGE_KEY}_invoices`, INITIAL_INVOICES);
   });
 
   const [expenses, setExpenses] = useState<ExpenseItem[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_expenses`);
-    return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
+    return safeGet(`${STORAGE_KEY}_expenses`, INITIAL_EXPENSES);
   });
 
   const [leads, setLeads] = useState<ParentLead[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_leads`);
-    return saved ? JSON.parse(saved) : INITIAL_LEADS;
+    return safeGet(`${STORAGE_KEY}_leads`, INITIAL_LEADS);
   });
 
   const [tutors, setTutors] = useState<TutorAssistant[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_tutors`);
-    return saved ? JSON.parse(saved) : INITIAL_TUTORS;
+    return safeGet(`${STORAGE_KEY}_tutors`, INITIAL_TUTORS);
   });
 
   const [classes, setClasses] = useState<ClassGroup[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_classes`);
-    return saved ? JSON.parse(saved) : INITIAL_CLASSES;
+    return safeGet(`${STORAGE_KEY}_classes`, INITIAL_CLASSES);
   });
 
   const [scheduleSessions, setScheduleSessions] = useState<ScheduleSession[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_scheduleSessions`);
-    return saved ? JSON.parse(saved) : INITIAL_SCHEDULE_SESSIONS;
+    return safeGet(`${STORAGE_KEY}_scheduleSessions`, INITIAL_SCHEDULE_SESSIONS);
   });
 
   const [attendance, setAttendance] = useState<StudentAttendance[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_attendance`);
-    return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE;
+    return safeGet(`${STORAGE_KEY}_attendance`, INITIAL_ATTENDANCE);
   });
 
   const [lessons, setLessons] = useState<LMSLesson[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_lessons`);
-    return saved ? JSON.parse(saved) : INITIAL_LMS_LESSONS;
+    return safeGet(`${STORAGE_KEY}_lessons`, INITIAL_LMS_LESSONS);
   });
 
   const [assignments, setAssignments] = useState<LMSAssignment[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_assignments`);
-    return saved ? JSON.parse(saved) : INITIAL_ASSIGNMENTS;
+    return safeGet(`${STORAGE_KEY}_assignments`, INITIAL_ASSIGNMENTS);
   });
 
   const [submissions, setSubmissions] = useState<LMSSubmission[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_submissions`);
-    return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
+    return safeGet(`${STORAGE_KEY}_submissions`, INITIAL_SUBMISSIONS);
   });
+
+  // Manual Database Save & Persistence State
+  const [isSavingToDatabase, setIsSavingToDatabase] = useState<boolean>(false);
+  const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(() => {
+    return localStorage.getItem(`${STORAGE_KEY}_last_saved_time`);
+  });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [globalToast, setGlobalToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const showGlobalToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setGlobalToast({ message, type });
+    setTimeout(() => {
+      setGlobalToast((prev) => (prev?.message === message ? null : prev));
+    }, 4500);
+  };
+
+  const hideGlobalToast = () => setGlobalToast(null);
 
   // Sync to LocalStorage
   useEffect(() => {
@@ -520,6 +549,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     prevSubmissions.current = submissions;
   }, [submissions, isLoadingFromCloud]);
 
+  /**
+   * Explicit Manual Save to Cloud Firestore Database
+   */
+  const saveAllToDatabase = async (
+    notify: boolean = true
+  ): Promise<{ success: boolean; message?: string; totalSaved?: number; timestamp?: string }> => {
+    setIsSavingToDatabase(true);
+    try {
+      const result = await saveAllCollectionsToFirestore({
+        users,
+        students,
+        subjects,
+        tuitionPlans,
+        invoices,
+        expenses,
+        leads,
+        tutors,
+        classes,
+        scheduleSessions,
+        attendance,
+        lessons,
+        assignments,
+        submissions,
+      });
+
+      const timeStr = result.timestamp;
+      setLastSavedTimestamp(timeStr);
+      localStorage.setItem(`${STORAGE_KEY}_last_saved_time`, timeStr);
+      setHasUnsavedChanges(false);
+      setIsFirebaseConnected(true);
+
+      const successMsg = `Đã lưu toàn bộ dữ liệu (${result.totalSaved} bản ghi / ${result.collectionsSaved} bảng) lên Firebase Database thành công!`;
+      if (notify) {
+        showGlobalToast(successMsg, 'success');
+      }
+
+      return {
+        success: true,
+        message: successMsg,
+        totalSaved: result.totalSaved,
+        timestamp: timeStr,
+      };
+    } catch (error: any) {
+      console.error('Lỗi khi lưu dữ liệu lên database:', error);
+      const errMsg = error?.message || 'Không thể lưu lên cơ sở dữ liệu. Vui lòng kiểm tra kết nối mạng.';
+      if (notify) {
+        showGlobalToast(`Lưu dữ liệu thất bại: ${errMsg}`, 'error');
+      }
+      return {
+        success: false,
+        message: errMsg,
+      };
+    } finally {
+      setIsSavingToDatabase(false);
+    }
+  };
+
+  // Keyboard shortcut Ctrl+S / Cmd+S to quickly save to Database
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        saveAllToDatabase(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    users,
+    students,
+    subjects,
+    tuitionPlans,
+    invoices,
+    expenses,
+    leads,
+    tutors,
+    classes,
+    scheduleSessions,
+    attendance,
+    lessons,
+    assignments,
+    submissions,
+  ]);
+
   // Auth Handlers
   const login = async (identifier: string, password?: string): Promise<{ success: boolean; message?: string }> => {
     const q = identifier.trim().toLowerCase();
@@ -707,6 +820,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) => prev.filter((u) => u.id !== id));
   };
 
+  const deleteUsers = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const targetSet = new Set(ids);
+    setUsers((prev) => prev.filter((u) => !targetSet.has(u.id)));
+  };
+
   const toggleUserStatus = (id: string) => {
     setUsers((prev) =>
       prev.map((u) => {
@@ -830,6 +949,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteStudent = (id: string) => {
     setStudents((prev) => prev.filter((s) => s.id !== id));
+    setInvoices((prev) => prev.filter((inv) => inv.studentId !== id));
+    setAttendance((prev) => prev.filter((att) => att.studentId !== id));
+  };
+
+  const deleteStudents = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const targetSet = new Set(ids);
+    setStudents((prev) => prev.filter((s) => !targetSet.has(s.id)));
+    setInvoices((prev) => prev.filter((inv) => !targetSet.has(inv.studentId)));
+    setAttendance((prev) => prev.filter((att) => !targetSet.has(att.studentId)));
   };
 
   const addPayment = (invoiceId: string, paymentData: Omit<PaymentTransaction, 'id' | 'invoiceId'>) => {
@@ -1016,6 +1145,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateTutorStatus = (id: string, status: TutorStatus) => {
     setTutors((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
+  };
+
+  const deleteTutor = (id: string) => {
+    setTutors((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const deleteTutors = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const targetSet = new Set(ids);
+    setTutors((prev) => prev.filter((t) => !targetSet.has(t.id)));
   };
 
   const addScheduleSession = (sessionData: Omit<ScheduleSession, 'id'>): ScheduleSession => {
@@ -1425,6 +1564,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addStudent,
         updateStudent,
         deleteStudent,
+        deleteStudents,
         addPayment,
         createInvoice,
         addExpense,
@@ -1436,6 +1576,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         convertLeadToStudent,
         addTutor,
         updateTutorStatus,
+        deleteTutor,
+        deleteTutors,
         addScheduleSession,
         updateScheduleSession,
         deleteScheduleSession,
@@ -1447,6 +1589,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addNewUser,
         updateUser,
         deleteUser,
+        deleteUsers,
         toggleUserStatus,
         importExcelData,
         cleanAndNormalizeData,
@@ -1457,6 +1600,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsCompactView,
         isLoadingFromCloud,
         isFirebaseConnected,
+        isSavingToDatabase,
+        lastSavedTimestamp,
+        hasUnsavedChanges,
+        saveAllToDatabase,
+        globalToast,
+        showGlobalToast,
+        hideGlobalToast,
       }}
     >
       {children}

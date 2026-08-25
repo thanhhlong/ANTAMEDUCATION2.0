@@ -181,9 +181,9 @@ export const CrmManager: React.FC<CrmManagerProps> = ({ onNavigateToTutoring }) 
         {[
           { id: 'new', label: 'Lead Mới', count: leads.filter((l) => l.status === 'new').length, color: 'text-amber-700 bg-amber-50 border-amber-200' },
           { id: 'consulting', label: 'Đang Tư Vấn', count: leads.filter((l) => l.status === 'consulting').length, color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
-          { id: 'trial', label: 'Hẹn Học Thử', count: leads.filter((l) => l.status === 'trial').length, color: 'text-purple-700 bg-purple-50 border-purple-200' },
+          { id: 'trial_scheduled', label: 'Hẹn Học Thử', count: leads.filter((l) => l.status === 'trial_scheduled').length, color: 'text-purple-700 bg-purple-50 border-purple-200' },
           { id: 'enrolled', label: 'Đã Chốt Nhập Học', count: leads.filter((l) => l.status === 'enrolled').length, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-          { id: 'cancelled', label: 'Hủy / Từ Chối', count: leads.filter((l) => l.status === 'cancelled').length, color: 'text-rose-700 bg-rose-50 border-rose-200' },
+          { id: 'unfit', label: 'Không Phù Hợp', count: leads.filter((l) => l.status === 'unfit').length, color: 'text-rose-700 bg-rose-50 border-rose-200' },
         ].map((st) => (
           <div
             key={st.id}
@@ -314,22 +314,26 @@ export const CrmManager: React.FC<CrmManagerProps> = ({ onNavigateToTutoring }) 
                         value={lead.status}
                         onChange={(e) => updateLeadStatus(lead.id, e.target.value as LeadStatus)}
                         className={`text-xs font-bold px-2.5 py-1 rounded-lg border bg-white cursor-pointer ${
-                          lead.status === 'enrolled'
+                          lead.status === 'enrolled' || lead.status === 'tuition_paid'
                             ? 'text-emerald-700 border-emerald-300'
-                            : lead.status === 'trial'
+                            : lead.status === 'trial_scheduled'
                             ? 'text-purple-700 border-purple-300'
-                            : lead.status === 'consulting'
+                            : lead.status === 'consulting' || lead.status === 'contacted'
                             ? 'text-indigo-700 border-indigo-300'
-                            : lead.status === 'cancelled'
+                            : lead.status === 'unfit' || lead.status === 'no_response'
                             ? 'text-rose-700 border-rose-300'
                             : 'text-amber-700 border-amber-300'
                         }`}
                       >
                         <option value="new">Mới</option>
+                        <option value="contacted">Đã liên hệ</option>
                         <option value="consulting">Đang tư vấn</option>
-                        <option value="trial">Hẹn học thử</option>
-                        <option value="enrolled">Đã chốt</option>
-                        <option value="cancelled">Hủy</option>
+                        <option value="trial_scheduled">Hẹn học thử</option>
+                        <option value="enrolled">Đã nhập học</option>
+                        <option value="tuition_paid">Đã đóng học phí</option>
+                        <option value="unfit">Không phù hợp</option>
+                        <option value="no_response">Không nghe máy</option>
+                        <option value="rescheduled">Dời lịch hẹn</option>
                       </select>
                     </td>
 

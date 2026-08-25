@@ -12,21 +12,25 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Initialize Firebase with fallback
+let app: any = null;
+let db: any = null;
 
-// Enable Offline Persistence for offline-first capabilities
 try {
+  app = initializeApp(firebaseConfig);
+  const databaseId = (firebaseConfig as any).firestoreDatabaseId;
+  db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+
+  // Enable Offline Persistence for offline-first capabilities
   enableIndexedDbPersistence(db).catch((err) => {
     if (err.code === 'failed-precondition') {
-      console.warn('Firebase Offline Persistence: Multiple tabs open, persistence can only be enabled in one tab at a time.');
+      console.warn('Firebase Offline Persistence: Multiple tabs open.');
     } else if (err.code === 'unimplemented') {
-      console.warn('Firebase Offline Persistence: The current browser does not support all of the features required to enable persistence.');
+      console.warn('Firebase Offline Persistence: Browser does not support persistence.');
     }
   });
 } catch (e) {
-  console.error('Failed to enable Firestore persistence:', e);
+  console.warn('Firebase initialization notice:', e);
 }
 
 /**
@@ -76,21 +80,84 @@ export async function deleteDocument(collectionName: string, id: string): Promis
 }
 
 /**
- * Bulk save documents in a collection (e.g., seeding database)
+ * Bulk save documents in a collection (e.g., seeding database or manual save)
  */
 export async function bulkSaveDocuments(collectionName: string, items: any[]): Promise<void> {
+  if (!items || items.length === 0) return;
   try {
-    const batch = writeBatch(db);
-    items.forEach((item) => {
-      const docRef = doc(db, collectionName, item.id);
-      const sanitized = JSON.parse(JSON.stringify(item, (key, value) => value === undefined ? null : value));
-      batch.set(docRef, sanitized, { merge: true });
-    });
-    await batch.commit();
+    const segmentSize = 400;
+    for (let i = 0; i < items.length; i += segmentSize) {
+      const batch = writeBatch(db);
+      const segment = items.slice(i, i + segmentSize);
+      segment.forEach((item) => {
+        if (!item || !item.id) return;
+        const docRef = doc(db, collectionName, item.id);
+        const sanitized = JSON.parse(JSON.stringify(item, (key, value) => value === undefined ? null : value));
+        batch.set(docRef, sanitized, { merge: true });
+      });
+      await batch.commit();
+    }
   } catch (error) {
     console.error(`Error batch saving ${collectionName}:`, error);
     throw error;
   }
+}
+
+export interface AllDatabaseCollections {
+  users?: any[];
+  students?: any[];
+  subjects?: any[];
+  tuitionPlans?: any[];
+  invoices?: any[];
+  expenses?: any[];
+  leads?: any[];
+  tutors?: any[];
+  classes?: any[];
+  scheduleSessions?: any[];
+  attendance?: any[];
+  lessons?: any[];
+  assignments?: any[];
+  submissions?: any[];
+}
+
+/**
+ * Persists all collections data to Firestore
+ */
+export async function saveAllCollectionsToFirestore(data: AllDatabaseCollections): Promise<{
+  totalSaved: number;
+  collectionsSaved: number;
+  timestamp: string;
+}> {
+  let totalCount = 0;
+  let colCount = 0;
+
+  const entries = Object.entries(data) as [string, any[]][];
+  for (const [colName, items] of entries) {
+    if (Array.isArray(items) && items.length > 0) {
+      await bulkSaveDocuments(colName, items);
+      totalCount += items.length;
+      colCount++;
+    }
+  }
+
+  // Update a metadata document with last sync timestamp
+  try {
+    const metaRef = doc(db, '_system_meta', 'sync_status');
+    await setDoc(metaRef, {
+      lastSavedAt: new Date().toISOString(),
+      totalRecords: totalCount,
+      collectionsCount: colCount,
+      environment: 'production'
+    }, { merge: true });
+  } catch (metaErr) {
+    console.warn('Could not write sync_status metadata:', metaErr);
+  }
+
+  return {
+    totalSaved: totalCount,
+    collectionsSaved: colCount,
+    timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  };
 }
 
 /**
@@ -101,15 +168,7 @@ export async function seedIfEmpty(collectionName: string, initialData: any[]): P
     const existing = await fetchCollection(collectionName);
     if (existing.length === 0 && initialData.length > 0) {
       console.log(`Seeding Firestore collection ${collectionName} with ${initialData.length} items.`);
-      // Run bulk save in segments to respect firestore batch limits (500 items max)
-      const segments: any[][] = [];
-      const segmentSize = 400;
-      for (let i = 0; i < initialData.length; i += segmentSize) {
-        segments.push(initialData.slice(i, i + segmentSize));
-      }
-      for (const segment of segments) {
-        await bulkSaveDocuments(collectionName, segment);
-      }
+      await bulkSaveDocuments(collectionName, initialData);
       return initialData;
     }
     return existing.length > 0 ? existing : initialData;

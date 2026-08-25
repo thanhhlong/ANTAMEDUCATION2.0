@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -167,11 +168,48 @@ Hãy giải đáp bằng tiếng Việt với phong cách sư phạm chuẩn m�
 
 // Serve static assets in production
 const distPath = path.join(__dirname, 'dist');
-app.use(express.static(distPath));
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+}
 
-// For SPA routing, redirect all other requests to index.html
+// For SPA routing, redirect all other requests to index.html or helpful instructions
 app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+      <meta charset="UTF-8" />
+      <title>AN TÂM EDUCATION - Khởi động máy chủ</title>
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+        .box { background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; max-width: 540px; }
+        h1 { color: #6366f1; margin-top: 0; font-size: 22px; }
+        p { color: #94a3b8; line-height: 1.6; font-size: 14px; }
+        code { background: #0f172a; color: #38bdf8; padding: 3px 8px; border-radius: 6px; font-size: 13px; }
+        .cmd-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin: 16px 0; text-align: left; font-family: monospace; color: #a5f3fc; }
+      </style>
+    </head>
+    <body>
+      <div class="box">
+        <h1>Hệ Thống AN TÂM EDUCATION</h1>
+        <p>Máy chủ Node.js Backend đang chạy tại cổng <strong>3000</strong>. Để xem giao diện ứng dụng web React, bạn có 2 cách khởi động:</p>
+        
+        <div style="text-align: left; margin: 20px 0;">
+          <p><strong>Cách 1 (Chế độ phát triển Dev - Đề xuất):</strong></p>
+          <div class="cmd-box">npm run dev</div>
+          
+          <p><strong>Cách 2 (Chế độ sản xuất Production):</strong></p>
+          <div class="cmd-box">npm run build<br/>npm run start</div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
 });
 
 app.listen(PORT, () => {

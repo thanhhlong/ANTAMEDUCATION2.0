@@ -27,6 +27,9 @@ import {
   Percent,
   UserCheck,
   UserX,
+  CheckSquare,
+  Square,
+  MinusSquare,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -44,6 +47,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
     addStudent,
     updateStudent,
     deleteStudent,
+    deleteStudents,
     isCompactView,
     setIsCompactView,
   } = useApp();
@@ -62,6 +66,12 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+
+  // Delete Modals & Batch Selection State
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [deleteSuccessMessage, setDeleteSuccessMessage] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -304,8 +314,86 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
     setIsAddModalOpen(false);
   };
 
+  // Selection & Delete Handlers
+  const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selectedStudentIds.includes(s.id));
+  const someFilteredSelected = selectedStudentIds.length > 0 && !allFilteredSelected;
+
+  const handleToggleSelectAll = () => {
+    if (allFilteredSelected) {
+      const filteredSet = new Set(filtered.map((s) => s.id));
+      setSelectedStudentIds((prev) => prev.filter((id) => !filteredSet.has(id)));
+    } else {
+      const filteredIds = filtered.map((s) => s.id);
+      setSelectedStudentIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
+  const handleToggleSelectStudent = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((sId) => sId !== id) : [...prev, id]
+    );
+  };
+
+  const handleOpenSingleDelete = (student: Student, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setStudentToDelete(student);
+  };
+
+  const handleConfirmSingleDelete = () => {
+    if (!studentToDelete) return;
+    const name = studentToDelete.fullName;
+    deleteStudent(studentToDelete.id);
+    setSelectedStudentIds((prev) => prev.filter((id) => id !== studentToDelete.id));
+    if (viewingStudent?.id === studentToDelete.id) setViewingStudent(null);
+    if (editingStudent?.id === studentToDelete.id) {
+      setEditingStudent(null);
+      setIsAddModalOpen(false);
+    }
+    setStudentToDelete(null);
+    setDeleteSuccessMessage(`Đã xóa thành công học sinh ${name}`);
+    setTimeout(() => setDeleteSuccessMessage(null), 3500);
+  };
+
+  const handleConfirmBulkDelete = () => {
+    if (selectedStudentIds.length === 0) return;
+    const count = selectedStudentIds.length;
+    if (deleteStudents) {
+      deleteStudents(selectedStudentIds);
+    } else {
+      selectedStudentIds.forEach((id) => deleteStudent(id));
+    }
+    if (viewingStudent && selectedStudentIds.includes(viewingStudent.id)) {
+      setViewingStudent(null);
+    }
+    if (editingStudent && selectedStudentIds.includes(editingStudent.id)) {
+      setEditingStudent(null);
+      setIsAddModalOpen(false);
+    }
+    setSelectedStudentIds([]);
+    setIsBulkDeleteOpen(false);
+    setDeleteSuccessMessage(`Đã xóa thành công ${count} học sinh đã chọn`);
+    setTimeout(() => setDeleteSuccessMessage(null), 3500);
+  };
+
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto text-slate-800">
+      {/* Delete Success Toast */}
+      {deleteSuccessMessage && (
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold shadow-xs animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{deleteSuccessMessage}</span>
+          </div>
+          <button
+            onClick={() => setDeleteSuccessMessage(null)}
+            className="p-1 rounded-md text-emerald-700 hover:bg-emerald-100 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -520,12 +608,57 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
         </div>
       </div>
 
+      {/* Bulk Action Bar (when students are selected) */}
+      {selectedStudentIds.length > 0 && (
+        <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 flex flex-wrap items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
+              {selectedStudentIds.length}
+            </span>
+            <span>Đang chọn {selectedStudentIds.length} học sinh</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedStudentIds([])}
+              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Bỏ chọn tất cả
+            </button>
+
+            <button
+              onClick={() => setIsBulkDeleteOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Xóa {selectedStudentIds.length} học sinh đã chọn</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Students Table */}
       <div className="rounded-xl bg-white border border-slate-200 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs lg:text-sm text-slate-700">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
               <tr>
+                <th className="px-3 py-3 w-10 text-center">
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAll}
+                    title={allFilteredSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả học sinh đang hiển thị'}
+                    className="p-1 rounded text-slate-500 hover:text-indigo-600 cursor-pointer"
+                  >
+                    {allFilteredSelected ? (
+                      <CheckSquare className="w-4 h-4 text-indigo-600" />
+                    ) : someFilteredSelected ? (
+                      <MinusSquare className="w-4 h-4 text-indigo-600" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-400" />
+                    )}
+                  </button>
+                </th>
                 <th className={isCompactView ? 'px-3 py-2 font-bold' : 'px-4 py-3.5 font-bold'}>Học Sinh</th>
                 <th className={isCompactView ? 'px-2 py-2 font-bold' : 'px-3 py-3.5 font-bold'}>Trạng Thái</th>
                 <th className={isCompactView ? 'px-2 py-2 font-bold' : 'px-3 py-3.5 font-bold'}>Khối / Lớp</th>
@@ -539,7 +672,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                  <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                     Không tìm thấy học sinh nào phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -548,9 +681,31 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                   const targetInv = invoices.find((i) => i.studentId === student.id);
                   const isDropped = student.status === 'dropped';
                   const discountPercent = student.tuitionDiscountPercent ?? (student.tuitionWaived ? 100 : 0);
+                  const isSelected = selectedStudentIds.includes(student.id);
 
                   return (
-                    <tr key={student.id} className={`hover:bg-slate-50/80 transition-colors ${isDropped ? 'bg-slate-50/40 opacity-80' : ''}`}>
+                    <tr
+                      key={student.id}
+                      className={`hover:bg-slate-50/80 transition-colors ${
+                        isSelected ? 'bg-indigo-50/50' : isDropped ? 'bg-slate-50/40 opacity-80' : ''
+                      }`}
+                    >
+                      {/* Checkbox column */}
+                      <td className="px-3 py-2 text-center w-10">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleSelectStudent(student.id, e)}
+                          title={isSelected ? 'Bỏ chọn' : 'Chọn học sinh này'}
+                          className="p-1 rounded text-slate-500 hover:text-indigo-600 cursor-pointer"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-indigo-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
+                          )}
+                        </button>
+                      </td>
+
                       {/* Name & Code */}
                       <td className={isCompactView ? 'px-3 py-1.5' : 'px-4 py-3.5'}>
                         <div className="flex items-center gap-2.5">
@@ -695,13 +850,9 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
                           </button>
 
                           <button
-                            onClick={() => {
-                              if (confirm(`Bạn có chắc chắn muốn xóa học sinh ${student.fullName}?`)) {
-                                deleteStudent(student.id);
-                              }
-                            }}
-                            title="Xóa học sinh"
-                            className="p-1 rounded-md bg-slate-100 text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                            onClick={(e) => handleOpenSingleDelete(student, e)}
+                            title="Xóa học sinh khỏi hệ thống"
+                            className="p-1 rounded-md bg-rose-50 text-rose-600 hover:text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer border border-rose-200"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1226,20 +1377,35 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
               </div>
 
               {/* Form Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold"
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
-                >
-                  {editingStudent ? 'Cập Nhật Học Sinh' : 'Lưu & Tạo Học Phí'}
-                </button>
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <div>
+                  {editingStudent && (
+                    <button
+                      type="button"
+                      onClick={() => setStudentToDelete(editingStudent)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Xóa học sinh này</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold cursor-pointer"
+                  >
+                    Hủy Bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                  >
+                    {editingStudent ? 'Cập Nhật Học Sinh' : 'Lưu & Tạo Học Phí'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1351,12 +1517,128 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
               </div>
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
               <button
-                onClick={() => setViewingStudent(null)}
-                className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold"
+                type="button"
+                onClick={() => {
+                  setStudentToDelete(viewingStudent);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors cursor-pointer"
               >
-                Đóng
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Xóa học sinh</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const st = viewingStudent;
+                    setViewingStudent(null);
+                    handleOpenEdit(st);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Chỉnh Sửa</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingStudent(null)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Student Delete Confirmation Modal */}
+      {studentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl text-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Xác Nhận Xóa Học Sinh</h3>
+                <p className="text-xs text-slate-500">Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-100 space-y-2 text-xs">
+              <div className="text-slate-700 font-medium">
+                Bạn có chắc chắn muốn xóa học sinh <strong className="text-rose-700 font-bold">{studentToDelete.fullName}</strong> ({studentToDelete.code})?
+              </div>
+              <div className="text-slate-500 text-[11px] space-y-0.5 pt-1 border-t border-rose-200/50">
+                <div>• <strong>Khối/Lớp:</strong> Khối {studentToDelete.grade} ({studentToDelete.className})</div>
+                <div>• <strong>Phụ huynh:</strong> {studentToDelete.parentName} ({studentToDelete.parentPhone})</div>
+                <div>• <strong>Môn học & Công nợ:</strong> {studentToDelete.enrollments.length} môn • Nợ {formatCurrency(studentToDelete.remainingDebt)}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setStudentToDelete(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSingleDelete}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Xác Nhận Xóa</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {isBulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl text-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Xóa Hàng Loạt Học Sinh</h3>
+                <p className="text-xs text-slate-500">Đang chọn {selectedStudentIds.length} học sinh</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-100 space-y-2 text-xs">
+              <div className="text-slate-700 font-medium">
+                Bạn có chắc chắn muốn xóa vĩnh viễn <strong className="text-rose-700 font-bold">{selectedStudentIds.length} học sinh</strong> đã chọn?
+              </div>
+              <p className="text-slate-500 text-[11px] leading-relaxed">
+                Tất cả dữ liệu hồ sơ, lịch sử học tập, môn đăng ký và công nợ học phí của các học sinh này sẽ bị xóa sạch khỏi hệ thống.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkDelete}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Xóa {selectedStudentIds.length} Học Sinh</span>
               </button>
             </div>
           </div>

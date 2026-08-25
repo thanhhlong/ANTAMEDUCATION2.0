@@ -11,6 +11,10 @@ import {
   BookOpen,
   LogIn,
   Menu,
+  Save,
+  Loader2,
+  CheckCircle2,
+  CloudUpload,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -34,7 +38,28 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenProfile,
   onToggleSidebar,
 }) => {
-  const { currentRole, quickLoginAsRole, selectedGrade, setSelectedGrade, currentUser, isAuthenticated } = useApp();
+  const {
+    currentRole,
+    quickLoginAsRole,
+    selectedGrade,
+    setSelectedGrade,
+    currentUser,
+    isAuthenticated,
+    saveAllToDatabase,
+    isSavingToDatabase,
+    lastSavedTimestamp,
+    isFirebaseConnected,
+  } = useApp();
+
+  const [recentlySaved, setRecentlySaved] = React.useState(false);
+
+  const handleManualSave = async () => {
+    const res = await saveAllToDatabase(true);
+    if (res.success) {
+      setRecentlySaved(true);
+      setTimeout(() => setRecentlySaved(false), 2500);
+    }
+  };
 
   const roleOptions: { role: UserRole; label: string; icon: any }[] = [
     { role: 'SUPER_ADMIN', label: 'Quản trị viên', icon: Shield },
@@ -125,6 +150,42 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Actions & User Auth */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Primary Save Data to Database Button */}
+          <button
+            onClick={handleManualSave}
+            disabled={isSavingToDatabase}
+            title={
+              lastSavedTimestamp
+                ? `Đã lưu cơ sở dữ liệu lúc: ${lastSavedTimestamp} (Bấm để cập nhật lại / Phím tắt: Ctrl + S)`
+                : 'Lưu toàn bộ thay đổi lên Firebase Database (Phím tắt: Ctrl + S)'
+            }
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap ${
+              recentlySaved
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                : isSavingToDatabase
+                ? 'bg-indigo-400 text-white cursor-wait opacity-90'
+                : 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white'
+            }`}
+          >
+            {isSavingToDatabase ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+            ) : recentlySaved ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+            ) : (
+              <CloudUpload className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>
+              {isSavingToDatabase
+                ? 'Đang Lưu...'
+                : recentlySaved
+                ? 'Đã Lưu Xong!'
+                : 'Lưu Dữ Liệu'}
+            </span>
+            <span className="hidden sm:inline-block px-1 py-0.2 bg-white/20 text-white text-[9px] rounded font-mono font-semibold">
+              Ctrl+S
+            </span>
+          </button>
+
           <button
             onClick={onOpenPublicForm}
             className="hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer whitespace-nowrap shadow-2xs"

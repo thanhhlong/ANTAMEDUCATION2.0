@@ -28,7 +28,7 @@ node -v
 echo.
 
 :: Install dependencies
-echo [2/3] Dang cai dat cac thu vien va phu thuoc (npm install)...
+echo [2/3] Dang kiem tra va cai dat cac thu vien (npm install)...
 echo Thao tac nay chi can thuc hien trong lan dau tien khoi chay.
 echo Vui long cho trong giay lat...
 echo.
@@ -39,6 +39,11 @@ if not exist .env (
     echo [OK] Sao chep va khoi tao file cau hinh .env...
     copy .env.example .env >nul
 )
+
+:: Build web application assets if not built
+echo.
+echo [3/3] Dang dong goi giao dien ung dung (npm run build)...
+call npm run build
 
 :: Clear screen and launch server
 cls

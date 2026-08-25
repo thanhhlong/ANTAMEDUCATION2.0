@@ -80,6 +80,7 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ initialSes
       const record = attendanceMap[st.id] || { status: 'present', notes: '', checkInTime: '17:30' };
       return {
         studentId: st.id,
+        studentCode: st.code || '',
         studentName: st.fullName,
         date: selectedSession.date,
         status: record.status,

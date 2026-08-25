@@ -27,7 +27,7 @@ echo "[OK] Đã tìm thấy Node.js phiên bản: $(node -v)"
 echo ""
 
 # Install dependencies
-echo "[2/3] Đang cài đặt các thư viện phụ thuộc (npm install)..."
+echo "[2/3] Đang kiểm tra và cài đặt các thư viện phụ thuộc (npm install)..."
 echo "Thao tác này chỉ cần thực hiện trong lần đầu tiên khởi chạy."
 echo "Vui lòng chờ trong giây lát..."
 echo ""
@@ -38,6 +38,11 @@ if [ ! -f .env ]; then
     echo "[OK] Sao chép và khởi tạo file cấu hình .env..."
     cp .env.example .env
 fi
+
+# Build web application
+echo ""
+echo "[3/3] Đang đóng gói giao diện ứng dụng (npm run build)..."
+npm run build
 
 # Clear screen and launch
 clear

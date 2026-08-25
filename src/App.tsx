@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/common/Navbar';
 import { Sidebar, ActiveTab } from './components/common/Sidebar';
+import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import { AdminOverview } from './components/dashboard/AdminOverview';
 import { StudentManager } from './components/students/StudentManager';
 import { FinanceManager } from './components/finance/FinanceManager';
@@ -40,6 +41,8 @@ const MainAppContent: React.FC = () => {
     setIsAuthModalOpen,
     isLoginPageView,
     setIsLoginPageView,
+    globalToast,
+    hideGlobalToast,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -245,6 +248,41 @@ const MainAppContent: React.FC = () => {
           onClose={() => setIsProfileModalOpen(false)}
           onOpenLoginModal={() => setIsAuthModalOpen(true)}
         />
+      )}
+
+      {/* Global Toast Notification */}
+      {globalToast && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-md animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div
+            className={`flex items-start gap-3 p-4 rounded-xl shadow-lg border text-sm ${
+              globalToast.type === 'success'
+                ? 'bg-slate-900 text-white border-slate-700'
+                : globalToast.type === 'error'
+                ? 'bg-rose-900 text-white border-rose-700'
+                : 'bg-indigo-900 text-white border-indigo-700'
+            }`}
+          >
+            <div className="shrink-0 mt-0.5">
+              {globalToast.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              ) : globalToast.type === 'error' ? (
+                <AlertCircle className="w-5 h-5 text-rose-400" />
+              ) : (
+                <Info className="w-5 h-5 text-indigo-400" />
+              )}
+            </div>
+            <div className="flex-1 pr-2 leading-snug font-medium text-slate-100">
+              {globalToast.message}
+            </div>
+            <button
+              onClick={hideGlobalToast}
+              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              aria-label="Đóng thông báo"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -51,6 +51,7 @@ export const PublicRegistrationForm: React.FC<PublicRegistrationFormProps> = ({
       currentSchool: formData.currentSchool.trim(),
       targetGrade: formData.targetGrade,
       interestedSubjects: formData.interestedSubjects,
+      assignedConsultant: 'Ban Tuyển Sinh AN TÂM',
       interestedServices: [
         formData.serviceType === 'custom_tutoring' ? 'Gia sư theo yêu cầu 1-on-1' : 'Lớp học tiêu chuẩn',
       ],

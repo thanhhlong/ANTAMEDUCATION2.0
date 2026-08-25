@@ -17,19 +17,27 @@ Máy tính của bạn cần cài đặt Node.js để chạy máy chủ nội b
 B. CÁCH KHỞI CHẠY TRỰC TIẾP (Cực kỳ đơn giản)
 -----------------------------------------------------------------------
 
-👉 TRÊN HỆ ĐIỀU HÀNH WINDOWS:
-   1. Giải nén toàn bộ thư mục file .zip này ra máy tính.
-   2. Nhấp đúp chuột vào file "chay_he_thong.bat".
-   3. Hệ thống sẽ tự động cài đặt thư viện cần thiết trong lần đầu tiên, khởi động server nội bộ và mở trình duyệt web địa chỉ http://localhost:3000 để bạn sử dụng ngay lập tức!
+👉 CÁCH 1: DÙNG FILE CHẠY NHANH TỰ ĐỘNG
+   - Trên Windows: Nhấp đúp chuột vào file "chay_he_thong.bat".
+   - Trên macOS/Linux: Chạy lệnh "./chay_he_thong.sh" trong Terminal.
+   Hệ thống sẽ tự động cài đặt thư viện, build giao diện và mở trình duyệt tại http://localhost:3000.
 
-👉 TRÊN HỆ ĐIỀU HÀNH macOS / LINUX:
-   1. Giải nén file .zip ra thư mục của bạn.
-   2. Mở ứng dụng Terminal.
-   3. Di chuyển đến thư mục vừa giải nén (ví dụ: cd ~/Downloads/antam-education).
-   4. Cấp quyền thực thi cho file chạy bằng lệnh: 
-      chmod +x chay_he_thong.sh
-   5. Chạy file bằng lệnh: 
-      ./chay_he_thong.sh
+👉 CÁCH 2: DÙNG LỆNH TRỰC TIẾP (KHUYÊN DÙNG NẾU MUỐN CHẠY DEV):
+   1. Mở Terminal / CMD tại thư mục dự án.
+   2. Chạy lệnh:
+      npm install
+      npm run dev
+   3. Mở trình duyệt và truy cập: http://localhost:3000
+
+-----------------------------------------------------------------------
+C. XỬ LÝ KHI GẶP MÀN HÌNH TRẮNG TRÊN LOCALHOST:3000
+-----------------------------------------------------------------------
+Nếu truy cập http://localhost:3000 mà thấy màn hình trắng hoặc chưa tải xong:
+1. Bạn hãy chạy lệnh sau trong Terminal để đóng gói giao diện:
+   npm run build
+2. Hoặc khởi động chế độ phát triển trực tiếp bằng lệnh:
+   npm run dev
+3. Làm mới trình duyệt (nhấn tổ hợp phím Ctrl + Shift + R hoặc Cmd + Shift + R để xóa cache).
 
 -----------------------------------------------------------------------
 C. CẤU HÌNH TÍNH NĂNG AI (GEMINI) - Tùy chọn

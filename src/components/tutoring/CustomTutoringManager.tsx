@@ -72,7 +72,7 @@ export const CustomTutoringManager: React.FC<CustomTutoringManagerProps> = ({
 
     // Create a schedule session for this 1-on-1 tutoring
     addScheduleSession({
-      classGroupId: `grp-tut-${Date.now()}`,
+      classId: `grp-tut-${Date.now()}`,
       className: `1-1: ${selectedLead.studentName} (${selectedLead.interestedSubjects[0] || 'Toán'})`,
       subjectId: 'sub-toan',
       subjectName: selectedLead.interestedSubjects[0] || 'Toán học',
@@ -83,11 +83,12 @@ export const CustomTutoringManager: React.FC<CustomTutoringManagerProps> = ({
       tutorName: chosenTutor.fullName,
       room: 'Phòng VIP 102 (Gia sư 1-on-1)',
       dayOfWeek: 3,
+      shift: 3,
       date: new Date().toISOString().split('T')[0],
       startTime: '19:30',
       endTime: '21:00',
-      status: 'upcoming',
-      notes: `Gia sư theo yêu cầu: ${selectedLead.customTutoring?.topic || 'Bồi dưỡng kiến thức'}`,
+      topic: selectedLead.customTutoring?.topic || 'Bồi dưỡng kiến thức theo yêu cầu',
+      status: 'scheduled',
     });
 
     updateLeadStatus(selectedLead.id, 'enrolled', `Đã ghép gia sư ${chosenTutor.fullName} (${chosenTutor.university})`);

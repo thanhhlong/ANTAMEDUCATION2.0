@@ -22,6 +22,9 @@ import {
   GraduationCap,
   Settings,
   Trash2,
+  CheckSquare,
+  Square,
+  MinusSquare,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -32,6 +35,7 @@ export const RolePermissionManager: React.FC = () => {
     addNewUser,
     updateUser,
     deleteUser,
+    deleteUsers,
     toggleUserStatus,
   } = useApp();
 
@@ -40,6 +44,11 @@ export const RolePermissionManager: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<AuthUser | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Delete Modals & Batch Selection State
+  const [userToDelete, setUserToDelete] = useState<AuthUser | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
 
   // New User Form State
   const [formData, setFormData] = useState({
@@ -110,6 +119,34 @@ export const RolePermissionManager: React.FC = () => {
     showToast(`Đã đặt lại mật khẩu cho ${user.fullName} về mặc định (123)`);
   };
 
+  const handleConfirmSingleDelete = () => {
+    if (!userToDelete) return;
+    const name = userToDelete.fullName;
+    deleteUser(userToDelete.id);
+    setSelectedUserIds((prev) => prev.filter((id) => id !== userToDelete.id));
+    if (selectedUserForEdit?.id === userToDelete.id) {
+      setSelectedUserForEdit(null);
+    }
+    setUserToDelete(null);
+    showToast(`Đã xóa tài khoản ${name} thành công`);
+  };
+
+  const handleConfirmBulkDelete = () => {
+    if (selectedUserIds.length === 0) return;
+    const count = selectedUserIds.length;
+    if (deleteUsers) {
+      deleteUsers(selectedUserIds);
+    } else {
+      selectedUserIds.forEach((id) => deleteUser(id));
+    }
+    if (selectedUserForEdit && selectedUserIds.includes(selectedUserForEdit.id)) {
+      setSelectedUserForEdit(null);
+    }
+    setSelectedUserIds([]);
+    setIsBulkDeleteOpen(false);
+    showToast(`Đã xóa ${count} tài khoản thành công`);
+  };
+
   const filteredUsers = users.filter((u) => {
     const matchRole = roleFilter === 'all' || u.role === roleFilter;
     const matchSearch =
@@ -119,6 +156,33 @@ export const RolePermissionManager: React.FC = () => {
       (u.phone && u.phone.includes(searchTerm));
     return matchRole && matchSearch;
   });
+
+  // Deletable users in current filter (exclude self and SUPER_ADMIN)
+  const deletableFilteredUsers = filteredUsers.filter(
+    (u) => u.id !== currentUser?.id && u.role !== 'SUPER_ADMIN'
+  );
+
+  const allFilteredSelected =
+    deletableFilteredUsers.length > 0 &&
+    deletableFilteredUsers.every((u) => selectedUserIds.includes(u.id));
+  const someFilteredSelected = selectedUserIds.length > 0 && !allFilteredSelected;
+
+  const handleToggleSelectAll = () => {
+    if (allFilteredSelected) {
+      const deletableSet = new Set(deletableFilteredUsers.map((u) => u.id));
+      setSelectedUserIds((prev) => prev.filter((id) => !deletableSet.has(id)));
+    } else {
+      const deletableIds = deletableFilteredUsers.map((u) => u.id);
+      setSelectedUserIds((prev) => Array.from(new Set([...prev, ...deletableIds])));
+    }
+  };
+
+  const handleToggleSelectUser = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((uId) => uId !== id) : [...prev, id]
+    );
+  };
 
   const allPermissionsList: { key: PermissionKey; label: string; desc: string; category: string }[] = [
     { key: 'VIEW_DASHBOARD', label: 'Xem Báo Cáo / Dashboard', desc: 'Truy cập màn hình tổng quan chỉ số', category: 'Tổng quan' },
@@ -282,12 +346,59 @@ export const RolePermissionManager: React.FC = () => {
             </div>
           </div>
 
+          {/* Bulk Action Bar (when accounts are selected) */}
+          {selectedUserIds.length > 0 && (
+            <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 flex flex-wrap items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-1">
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <span className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px]">
+                  {selectedUserIds.length}
+                </span>
+                <span>Đang chọn {selectedUserIds.length} tài khoản nhân sự / thầy cô</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserIds([])}
+                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Bỏ chọn tất cả
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBulkDeleteOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Xóa {selectedUserIds.length} tài khoản đã chọn</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* User Table */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                    <th className="py-3.5 px-4 w-10">
+                      <button
+                        type="button"
+                        onClick={handleToggleSelectAll}
+                        className="p-1 rounded text-slate-400 hover:text-indigo-600 cursor-pointer"
+                        title="Chọn tất cả tài khoản có thể xóa"
+                      >
+                        {allFilteredSelected ? (
+                          <CheckSquare className="w-4 h-4 text-indigo-600" />
+                        ) : someFilteredSelected ? (
+                          <MinusSquare className="w-4 h-4 text-indigo-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
+                        )}
+                      </button>
+                    </th>
                     <th className="py-3.5 px-4">Tài Khoản & Họ Tên</th>
                     <th className="py-3.5 px-4">Vai Trò & Chức Danh</th>
                     <th className="py-3.5 px-4">Phụ Trách Lớp</th>
@@ -299,10 +410,37 @@ export const RolePermissionManager: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {filteredUsers.map((user) => {
                     const isSelf = currentUser?.id === user.id;
+                    const isSuperAdmin = user.role === 'SUPER_ADMIN';
+                    const canDelete = !isSelf && !isSuperAdmin;
+                    const isSelected = selectedUserIds.includes(user.id);
                     const roleConfig = ROLE_PERMISSION_CONFIGS.find((c) => c.role === user.role);
 
                     return (
-                      <tr key={user.id} className="hover:bg-slate-50/70 transition-colors">
+                      <tr
+                        key={user.id}
+                        className={`transition-colors ${
+                          isSelected ? 'bg-indigo-50/30' : 'hover:bg-slate-50/70'
+                        }`}
+                      >
+                        <td className="py-3.5 px-4">
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleSelectUser(user.id, e)}
+                              className="p-1 rounded text-slate-400 hover:text-indigo-600 cursor-pointer"
+                              title={isSelected ? 'Bỏ chọn' : 'Chọn tài khoản này'}
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-indigo-600" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
+                              )}
+                            </button>
+                          ) : (
+                            <span className="inline-block w-4 h-4" />
+                          )}
+                        </td>
+
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-800 font-black text-xs flex items-center justify-center border border-slate-200 shrink-0">
@@ -382,6 +520,7 @@ export const RolePermissionManager: React.FC = () => {
                           <div className="flex items-center justify-end gap-1.5">
                             {/* Reset Password */}
                             <button
+                              type="button"
                               onClick={() => handleResetPassword(user)}
                               title="Đặt lại mật khẩu mặc định (123)"
                               className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
@@ -392,6 +531,7 @@ export const RolePermissionManager: React.FC = () => {
                             {/* Lock / Unlock Toggle */}
                             {!isSelf && (
                               <button
+                                type="button"
                                 onClick={() => {
                                   toggleUserStatus(user.id);
                                   showToast(
@@ -415,6 +555,7 @@ export const RolePermissionManager: React.FC = () => {
 
                             {/* Edit Modal */}
                             <button
+                              type="button"
                               onClick={() => setSelectedUserForEdit(user)}
                               title="Chỉnh sửa thông tin & phân quyền"
                               className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
@@ -422,16 +563,12 @@ export const RolePermissionManager: React.FC = () => {
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Delete (only for non-superadmin and non-self) */}
-                            {!isSelf && user.role !== 'SUPER_ADMIN' && (
+                            {/* Delete Button (with safe confirmation modal) */}
+                            {canDelete && (
                               <button
-                                onClick={() => {
-                                  if (confirm(`Bạn có chắc chắn muốn xóa tài khoản ${user.fullName}?`)) {
-                                    deleteUser(user.id);
-                                    showToast(`Đã xóa tài khoản ${user.fullName}`);
-                                  }
-                                }}
-                                title="Xóa tài khoản"
+                                type="button"
+                                onClick={() => setUserToDelete(user)}
+                                title="Xóa tài khoản thầy cô / nhân sự"
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -829,26 +966,138 @@ export const RolePermissionManager: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setSelectedUserForEdit(null)}
-                  className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-semibold cursor-pointer"
-                >
-                  Đóng
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    updateUser(selectedUserForEdit.id, selectedUserForEdit);
-                    showToast(`Đã cập nhật thông tin cho ${selectedUserForEdit.fullName}`);
-                    setSelectedUserForEdit(null);
-                  }}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-xs"
-                >
-                  Lưu Thay Đổi
-                </button>
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                <div>
+                  {selectedUserForEdit.id !== currentUser?.id && selectedUserForEdit.role !== 'SUPER_ADMIN' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = selectedUserForEdit;
+                        setSelectedUserForEdit(null);
+                        setUserToDelete(target);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Xóa tài khoản này</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserForEdit(null)}
+                    className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-semibold cursor-pointer text-xs"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateUser(selectedUserForEdit.id, selectedUserForEdit);
+                      showToast(`Đã cập nhật thông tin cho ${selectedUserForEdit.fullName}`);
+                      setSelectedUserForEdit(null);
+                    }}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-xs text-xs"
+                  >
+                    Lưu Thay Đổi
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single User Delete Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl text-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Xác Nhận Xóa Tài Khoản</h3>
+                <p className="text-xs text-slate-500">Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-100 space-y-2 text-xs">
+              <div className="text-slate-700 font-medium">
+                Bạn có chắc chắn muốn xóa tài khoản của thầy/cô <strong className="text-rose-700 font-bold">{userToDelete.fullName}</strong> (@{userToDelete.username})?
+              </div>
+              <div className="text-slate-500 text-[11px] space-y-0.5 pt-1 border-t border-rose-200/50">
+                <div>• <strong>Vai trò:</strong> {userToDelete.role} - {userToDelete.title || userToDelete.department}</div>
+                <div>• <strong>Email:</strong> {userToDelete.email}</div>
+                {userToDelete.phone && <div>• <strong>SĐT:</strong> {userToDelete.phone}</div>}
+                {userToDelete.assignedClasses && userToDelete.assignedClasses.length > 0 && (
+                  <div>• <strong>Lớp phụ trách:</strong> {userToDelete.assignedClasses.join(', ')}</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSingleDelete}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Xác Nhận Xóa</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {isBulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl text-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Xóa Hàng Loạt Tài Khoản</h3>
+                <p className="text-xs text-slate-500">Đang chọn {selectedUserIds.length} tài khoản</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-100 space-y-2 text-xs">
+              <div className="text-slate-700 font-medium">
+                Bạn có chắc chắn muốn xóa vĩnh viễn <strong className="text-rose-700 font-bold">{selectedUserIds.length} tài khoản</strong> đã chọn?
+              </div>
+              <p className="text-slate-500 text-[11px] leading-relaxed">
+                Các nhân sự này sẽ không thể đăng nhập vào hệ thống quản lý trung tâm nữa. Dữ liệu phân quyền và lớp phụ trách sẽ được thu hồi.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkDelete}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Xóa {selectedUserIds.length} Tài Khoản</span>
+              </button>
             </div>
           </div>
         </div>

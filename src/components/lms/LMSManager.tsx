@@ -278,10 +278,10 @@ export const LMSManager: React.FC = () => {
                 }`}
               >
                 <div className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 w-fit">
-                  Khối {ls.grade} • {ls.subjectName}
+                  Khối {ls.grade} • {subjects.find((s) => s.id === ls.subjectId)?.name || 'Môn học'}
                 </div>
                 <h3 className="font-bold text-slate-900 text-sm">{ls.title}</h3>
-                <div className="text-xs text-slate-500">Tác giả: {ls.author}</div>
+                <div className="text-xs text-slate-500">Chương: {ls.chapter}</div>
               </div>
             ))}
           </div>
@@ -291,7 +291,7 @@ export const LMSManager: React.FC = () => {
               <div className="p-5 lg:p-6 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
                 <div className="border-b border-slate-100 pb-3">
                   <div className="text-xs font-bold text-indigo-600">
-                    Khối {selectedLesson.grade} • Môn {selectedLesson.subjectName}
+                    Khối {selectedLesson.grade} • Môn {subjects.find((s) => s.id === selectedLesson.subjectId)?.name || 'Môn học'} • {selectedLesson.chapter}
                   </div>
                   <h2 className="text-lg font-bold text-slate-900 mt-1">{selectedLesson.title}</h2>
                 </div>
@@ -300,19 +300,19 @@ export const LMSManager: React.FC = () => {
                   {selectedLesson.content}
                 </div>
 
-                {selectedLesson.attachments.length > 0 && (
+                {selectedLesson.attachments && selectedLesson.attachments.length > 0 && (
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
                     <div className="text-xs font-bold text-slate-700">Tài liệu đính kèm:</div>
                     {selectedLesson.attachments.map((att, i) => (
                       <a
                         key={i}
-                        href={att.fileUrl}
+                        href={att.url}
                         target="_blank"
                         rel="noreferrer"
                         className="flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
                       >
                         <FileText className="w-3.5 h-3.5" />
-                        <span>{att.fileName}</span>
+                        <span>{att.name} ({att.size})</span>
                       </a>
                     ))}
                   </div>
