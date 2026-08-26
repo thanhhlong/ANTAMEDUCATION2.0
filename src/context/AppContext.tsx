@@ -40,6 +40,7 @@ import {
 import { ExcelImportResult } from '../utils/excelParser';
 import { cleanAndNormalizeAllData } from '../utils/dataCleaner';
 import { seedIfEmpty, saveDocument, deleteDocument, saveAllCollectionsToFirestore, fetchAllCollectionsFromFirestore } from '../services/firebase';
+import { logAuditEvent } from '../services/auditService';
 
 interface AppContextType {
   // Authentication & Session
@@ -457,11 +458,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLastSavedTimestamp(timeStr);
       setHasUnsavedChanges(false);
 
+      logAuditEvent({
+        action: 'SYNC',
+        entity: 'database',
+        description: `Lưu đồng bộ toàn bộ cơ sở dữ liệu (${totalSaved} bản ghi)`,
+        actorId: currentUser?.id || 'system',
+        actorName: currentUser?.fullName || 'Người dùng',
+        actorRole: currentUser?.role || 'SUPER_ADMIN',
+        severity: 'info',
+        details: { totalSaved }
+      });
+
       const successMsg = `Đã lưu toàn bộ dữ liệu (${totalSaved} bản ghi) vào hệ thống & Đám mây thành công!`;
       if (notify) {
         showGlobalToast(successMsg, 'success');
       }
-
       return {
         success: true,
         message: successMsg,
@@ -510,6 +521,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     a.download = `antam_backup_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+
+    logAuditEvent({
+      action: 'EXPORT',
+      entity: 'storage',
+      description: 'Xuất tệp sao lưu dữ liệu toàn hệ thống định dạng JSON',
+      actorId: currentUser?.id || 'system',
+      actorName: currentUser?.fullName || 'Quản trị viên',
+      actorRole: currentUser?.role || 'SUPER_ADMIN',
+      severity: 'info',
+    });
+
     showGlobalToast('Đã tải tệp sao lưu JSON về máy tính!', 'success');
   };
 
@@ -535,15 +557,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (Array.isArray(parsed.submissions)) setSubmissions(parsed.submissions);
       if (Array.isArray(parsed.users)) setUsers(parsed.users);
 
-      setTimeout(() => {
-        saveAllToDatabase(false);
-      }, 250);
-
       const total =
         (parsed.students?.length || 0) +
         (parsed.invoices?.length || 0) +
         (parsed.expenses?.length || 0) +
         (parsed.leads?.length || 0);
+
+      logAuditEvent({
+        action: 'IMPORT',
+        entity: 'storage',
+        description: `Khôi phục dữ liệu từ tệp sao lưu JSON (${total} bản ghi)`,
+        actorId: currentUser?.id || 'system',
+        actorName: currentUser?.fullName || 'Quản trị viên',
+        actorRole: currentUser?.role || 'SUPER_ADMIN',
+        severity: 'warning',
+      });
+
+      setTimeout(() => {
+        saveAllToDatabase(false);
+      }, 250);
 
       return { success: true, count: total };
     } catch (err: any) {

@@ -25,10 +25,14 @@ import {
   Loader2,
   CheckCircle2,
   Database,
+  Network,
+  FileText,
 } from 'lucide-react';
 
 export type ActiveTab =
   | 'overview'
+  | 'system_architecture'
+  | 'audit_log'
   | 'teacher_workspace'
   | 'students'
   | 'finance'
@@ -200,6 +204,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Phân Quyền & Tài Khoản',
       icon: ShieldCheck,
       roles: ['SUPER_ADMIN', 'ADMIN'],
+    },
+    {
+      id: 'system_architecture',
+      label: 'Kiến Trúc Hệ Thống 3.0',
+      icon: Network,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'ACCOUNTANT'],
+    },
+    {
+      id: 'audit_log',
+      label: 'Nhật Ký & Kiểm Toán',
+      icon: FileText,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER'],
     },
   ];
 

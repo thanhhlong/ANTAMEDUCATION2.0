@@ -26,6 +26,8 @@ import { AuthModal } from './components/auth/AuthModal';
 import { UserProfileModal } from './components/auth/UserProfileModal';
 import { LoginPage } from './components/auth/LoginPage';
 import { DatabaseManagerModal } from './components/common/DatabaseManagerModal';
+import { SystemArchitectureView } from './components/admin/SystemArchitectureView';
+import { AuditLogViewer } from './components/admin/AuditLogViewer';
 import { generateCenterExcelExport, generateSampleExcelWorkbook } from './utils/excelParser';
 
 const MainAppContent: React.FC = () => {
@@ -206,6 +208,10 @@ const MainAppContent: React.FC = () => {
           {activeTab === 'subjects' && <SubjectManager />}
 
           {activeTab === 'teacher_payroll' && <TeacherPayroll />}
+
+          {activeTab === 'system_architecture' && <SystemArchitectureView />}
+
+          {activeTab === 'audit_log' && <AuditLogViewer />}
         </main>
       </div>
 

@@ -435,3 +435,72 @@ export interface RolePermissionConfig {
   permissions: PermissionKey[];
 }
 
+export type AuditActionType =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'PAYMENT'
+  | 'EXPORT'
+  | 'IMPORT'
+  | 'AUTH'
+  | 'AI_QUERY'
+  | 'BACKUP'
+  | 'SYNC';
+
+export interface AuditLogEntry {
+  id: string;
+  action: AuditActionType;
+  entity: string; // 'student', 'invoice', 'expense', 'lead', 'class', 'grade', 'system', etc.
+  entityId?: string;
+  description: string;
+  actorId: string;
+  actorName: string;
+  actorRole: UserRole;
+  timestamp: string; // ISO 8601
+  severity: 'info' | 'warning' | 'critical';
+  details?: Record<string, any>;
+  ipAddress?: string;
+}
+
+export interface SystemArchitectureStatus {
+  version: string;
+  frontend: {
+    framework: string;
+    runtime: string;
+    modulesCount: number;
+    activeUsersCount: number;
+  };
+  backend: {
+    framework: string;
+    runtime: string;
+    status: 'online' | 'degraded' | 'offline';
+    uptimeSeconds: number;
+  };
+  auth: {
+    provider: string;
+    status: 'active' | 'offline';
+  };
+  database: {
+    engine: string;
+    totalDocuments: number;
+    collectionsCount: number;
+    connected: boolean;
+  };
+  pillars: {
+    storage: {
+      status: 'healthy';
+      storageType: string;
+      lastBackupTime?: string;
+    };
+    gemini: {
+      status: 'ready' | 'not_configured';
+      model: string;
+      capabilities: string[];
+    };
+    auditLog: {
+      status: 'recording';
+      totalLogs: number;
+    };
+  };
+}
+
