@@ -5,6 +5,8 @@ import {
   Subject,
   TuitionPlan,
   InvoiceRecord,
+  InvoiceLineItem,
+  StudentEnrollment,
   ExpenseItem,
   ParentLead,
   TutorAssistant,
@@ -102,10 +104,14 @@ interface AppContextType {
   // Finance Actions
   addPayment: (invoiceId: string, payment: Omit<PaymentTransaction, 'id' | 'invoiceId'>) => void;
   createInvoice: (invoice: Omit<InvoiceRecord, 'id' | 'paidAmount' | 'remainingAmount' | 'status' | 'paymentHistory' | 'createdAt'>) => void;
+  createMonthlyInvoices: (month: number, year: number, dueDate?: string) => number;
+  settleMonthlyInvoices: (month: number, year: number) => void;
+  updateInvoiceLineItem: (invoiceId: string, subjectId: string, updates: Partial<InvoiceLineItem>) => void;
   addExpense: (expense: Omit<ExpenseItem, 'id' | 'expenseCode'>) => void;
   deleteExpense: (id: string) => void;
   addSubject: (subject: Omit<Subject, 'id'>) => void;
   updateSubject: (id: string, updates: Partial<Subject>) => void;
+  deleteSubject: (id: string) => void;
 
   // CRM Actions
   addLead: (lead: Omit<ParentLead, 'id' | 'code' | 'timeline' | 'createdAt'>) => ParentLead;
@@ -114,9 +120,13 @@ interface AppContextType {
 
   // Tutor Actions
   addTutor: (tutor: Omit<TutorAssistant, 'id' | 'code' | 'createdAt'>) => void;
+  updateTutor: (id: string, updates: Partial<TutorAssistant>) => void;
   updateTutorStatus: (id: string, status: TutorStatus) => void;
   deleteTutor: (id: string) => void;
   deleteTutors: (ids: string[]) => void;
+
+  // Cross-Module Synchronization
+  syncAcademicToOperations: () => { syncedTutors: number; syncedStudents: number; syncedInvoices: number };
 
   // Schedule & Attendance
   addScheduleSession: (session: Omit<ScheduleSession, 'id'>) => ScheduleSession;
@@ -228,7 +238,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [tutors, setTutors] = useState<TutorAssistant[]>(() => {
-    return safeGet(`${STORAGE_KEY}_tutors`, INITIAL_TUTORS);
+    const loaded = safeGet(`${STORAGE_KEY}_tutors`, INITIAL_TUTORS);
+    const existingNames = new Set((loaded || []).map((t: TutorAssistant) => t.fullName?.toLowerCase().trim()));
+    const missingInitial = INITIAL_TUTORS.filter(
+      (initTut) => !existingNames.has(initTut.fullName?.toLowerCase().trim())
+    );
+    if (missingInitial.length > 0) {
+      return [...missingInitial, ...(loaded || [])];
+    }
+    return loaded;
   });
 
   const [classes, setClasses] = useState<ClassGroup[]>(() => {
@@ -992,17 +1010,96 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       invoiceId,
     };
 
+    let targetStudentId = '';
+    const subjectPaidDates: { [subjectId: string]: string } = {};
+
     setInvoices((prev) =>
       prev.map((inv) => {
         if (inv.id === invoiceId) {
+          targetStudentId = inv.studentId;
           const newPaid = inv.paidAmount + newPayment.amount;
           const newRemaining = Math.max(0, inv.totalAmount - newPaid);
           const newStatus = newRemaining === 0 ? 'paid' : newPaid > 0 ? 'partial' : inv.status;
+
+          let updatedLineItems = [...inv.lineItems];
+
+          if (newPayment.subjectBreakdown && newPayment.subjectBreakdown.length > 0) {
+            // Per-subject payment mode
+            const breakdownMap = new Map<string, { amount: number; paidDate?: string; notes?: string }>();
+            newPayment.subjectBreakdown.forEach((item) => {
+              breakdownMap.set(item.subjectId, {
+                amount: item.amount,
+                paidDate: item.paidDate || newPayment.paymentDate,
+                notes: item.notes,
+              });
+              if (item.amount > 0) {
+                subjectPaidDates[item.subjectId] = item.paidDate || newPayment.paymentDate;
+              }
+            });
+
+            updatedLineItems = updatedLineItems.map((li) => {
+              const payInfo = breakdownMap.get(li.subjectId);
+              if (payInfo && payInfo.amount > 0) {
+                const curPaid = li.paidAmount || 0;
+                const newLiPaid = curPaid + payInfo.amount;
+                const newLiRem = Math.max(0, li.amount - newLiPaid);
+                const liStatus = newLiRem === 0 ? 'paid' : newLiPaid > 0 ? 'partial' : 'unpaid';
+                return {
+                  ...li,
+                  paidAmount: newLiPaid,
+                  remainingAmount: newLiRem,
+                  paidDate: payInfo.paidDate || newPayment.paymentDate,
+                  status: liStatus,
+                  paymentMode: 'per_subject',
+                  notes: payInfo.notes || li.notes,
+                };
+              }
+              return li;
+            });
+          } else {
+            // Full / Lump sum payment mode: allocate to unpaid / partial line items
+            let remainingToAllocate = newPayment.amount;
+            updatedLineItems = updatedLineItems.map((li) => {
+              const curPaid = li.paidAmount || 0;
+              const curRemaining = li.remainingAmount !== undefined ? li.remainingAmount : (li.amount - curPaid);
+
+              if (curRemaining > 0 && remainingToAllocate > 0) {
+                const allocated = Math.min(remainingToAllocate, curRemaining);
+                remainingToAllocate -= allocated;
+                const newLiPaid = curPaid + allocated;
+                const newLiRem = Math.max(0, li.amount - newLiPaid);
+                const liStatus = newLiRem === 0 ? 'paid' : newLiPaid > 0 ? 'partial' : 'unpaid';
+                subjectPaidDates[li.subjectId] = newPayment.paymentDate;
+                return {
+                  ...li,
+                  paidAmount: newLiPaid,
+                  remainingAmount: newLiRem,
+                  paidDate: newPayment.paymentDate,
+                  status: liStatus,
+                  paymentMode: 'full',
+                };
+              } else if (newRemaining === 0) {
+                // If entire invoice is paid, ensure line items are marked as paid
+                subjectPaidDates[li.subjectId] = newPayment.paymentDate;
+                return {
+                  ...li,
+                  paidAmount: li.amount,
+                  remainingAmount: 0,
+                  paidDate: li.paidDate || newPayment.paymentDate,
+                  status: 'paid',
+                  paymentMode: 'full',
+                };
+              }
+              return li;
+            });
+          }
+
           return {
             ...inv,
             paidAmount: newPaid,
             remainingAmount: newRemaining,
             status: newStatus,
+            lineItems: updatedLineItems,
             paymentHistory: [newPayment, ...inv.paymentHistory],
           };
         }
@@ -1010,18 +1107,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
-    // Sync student total paid
+    // Sync student total paid and enrollments
     const targetInvoice = invoices.find((i) => i.id === invoiceId);
-    if (targetInvoice) {
+    const sId = targetStudentId || targetInvoice?.studentId;
+    if (sId) {
       setStudents((prev) =>
         prev.map((st) => {
-          if (st.id === targetInvoice.studentId) {
+          if (st.id === sId) {
             const updatedPaid = st.totalPaid + newPayment.amount;
             const updatedDebt = Math.max(0, st.totalTuitionDue - updatedPaid);
+            const updatedEnrollments = st.enrollments.map((en) => {
+              if (subjectPaidDates[en.subjectId]) {
+                return {
+                  ...en,
+                  lastPaidDate: subjectPaidDates[en.subjectId],
+                  paidStatus: 'paid' as const,
+                };
+              }
+              return en;
+            });
             return {
               ...st,
               totalPaid: updatedPaid,
               remainingDebt: updatedDebt,
+              enrollments: updatedEnrollments,
             };
           }
           return st;
@@ -1030,13 +1139,124 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateInvoiceLineItem = (invoiceId: string, subjectId: string, updates: Partial<InvoiceLineItem>) => {
+    setInvoices((prev) =>
+      prev.map((inv) => {
+        if (inv.id === invoiceId) {
+          const updatedLineItems = inv.lineItems.map((li) => {
+            if (li.subjectId === subjectId) {
+              const updated = { ...li, ...updates };
+              if (updated.paidAmount !== undefined) {
+                updated.remainingAmount = Math.max(0, updated.amount - updated.paidAmount);
+                updated.status = updated.remainingAmount === 0 ? 'paid' : updated.paidAmount > 0 ? 'partial' : 'unpaid';
+              }
+              return updated;
+            }
+            return li;
+          });
+
+          const totalPaid = updatedLineItems.reduce((sum, li) => sum + (li.paidAmount || 0), 0);
+          const totalRemaining = Math.max(0, inv.totalAmount - totalPaid);
+          const newStatus = totalRemaining === 0 ? 'paid' : totalPaid > 0 ? 'partial' : inv.status;
+
+          return {
+            ...inv,
+            lineItems: updatedLineItems,
+            paidAmount: totalPaid,
+            remainingAmount: totalRemaining,
+            status: newStatus,
+          };
+        }
+        return inv;
+      })
+    );
+  };
+
+  const createMonthlyInvoices = (month: number, year: number, dueDate?: string): number => {
+    const activeStudents = students.filter(
+      (s) => s.status === 'active' && s.enrollments && s.enrollments.length > 0 && !s.tuitionWaived
+    );
+    const existingStudentIdsInMonth = new Set(
+      invoices.filter((inv) => inv.month === month && inv.year === year).map((inv) => inv.studentId)
+    );
+
+    const newInvoices: InvoiceRecord[] = [];
+    const formattedDueDate = dueDate || `${year}-${String(month).padStart(2, '0')}-15`;
+
+    activeStudents.forEach((st) => {
+      if (!existingStudentIdsInMonth.has(st.id) && st.totalTuitionDue > 0) {
+        const invCode = `INV-${year}-${String(month).padStart(2, '0')}-${String(invoices.length + newInvoices.length + 1).padStart(3, '0')}`;
+        const lineItems: InvoiceLineItem[] = st.enrollments
+          .filter((en) => en.status === 'active')
+          .map((en) => ({
+            subjectId: en.subjectId,
+            subjectName: en.subjectName,
+            amount: en.finalFee,
+            paidAmount: 0,
+            remainingAmount: en.finalFee,
+            status: 'unpaid',
+          }));
+
+        const totalAmt = lineItems.reduce((sum, item) => sum + item.amount, 0);
+
+        newInvoices.push({
+          id: `inv-${Date.now()}-${st.id}`,
+          invoiceCode: invCode,
+          studentId: st.id,
+          studentName: st.fullName,
+          studentCode: st.code,
+          grade: st.grade,
+          month,
+          year,
+          dueDate: formattedDueDate,
+          totalAmount: totalAmt,
+          paidAmount: 0,
+          remainingAmount: totalAmt,
+          status: 'unpaid',
+          lineItems,
+          paymentHistory: [],
+          createdAt: new Date().toISOString().split('T')[0],
+        });
+      }
+    });
+
+    if (newInvoices.length > 0) {
+      setInvoices((prev) => [...newInvoices, ...prev]);
+    }
+    return newInvoices.length;
+  };
+
+  const settleMonthlyInvoices = (month: number, year: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    setInvoices((prev) =>
+      prev.map((inv) => {
+        if (inv.month === month && inv.year === year) {
+          return {
+            ...inv,
+            isSettled: true,
+            settledDate: today,
+          };
+        }
+        return inv;
+      })
+    );
+  };
+
   const createInvoice = (invoiceData: Omit<InvoiceRecord, 'id' | 'paidAmount' | 'remainingAmount' | 'status' | 'paymentHistory' | 'createdAt'>) => {
+    const lineItems: InvoiceLineItem[] = invoiceData.lineItems.map((li) => ({
+      ...li,
+      paidAmount: li.paidAmount || 0,
+      remainingAmount: li.remainingAmount !== undefined ? li.remainingAmount : li.amount,
+      status: li.status || 'unpaid',
+    }));
+
     const newInvoice: InvoiceRecord = {
       ...invoiceData,
       id: `inv-${Date.now()}`,
       paidAmount: 0,
       remainingAmount: invoiceData.totalAmount,
       status: 'unpaid',
+      lineItems,
       paymentHistory: [],
       createdAt: new Date().toISOString().split('T')[0],
     };
@@ -1065,7 +1285,190 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSubject = (id: string, updates: Partial<Subject>) => {
-    setSubjects((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+    let targetSubjectName = '';
+    let isPriceOrNameChanged = false;
+    let mergedSubject: Subject | null = null;
+
+    setSubjects((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id === id) {
+          targetSubjectName = s.name;
+          mergedSubject = { ...s, ...updates };
+          if (
+            updates.defaultFee !== undefined ||
+            updates.gradeFees !== undefined ||
+            updates.name !== undefined
+          ) {
+            isPriceOrNameChanged = true;
+          }
+          return mergedSubject;
+        }
+        return s;
+      });
+      return updated;
+    });
+
+    // Automatically synchronize pricing changes to all students and active invoices
+    if (isPriceOrNameChanged && mergedSubject) {
+      const updatedSub: Subject = mergedSubject;
+      let affectedStudentsCount = 0;
+
+      // 1. Update all students who are taking this subject based on their grade
+      setStudents((prevStudents) =>
+        prevStudents.map((st) => {
+          let hasSubject = false;
+          const studentGrade = st.grade || 8;
+
+          const updatedEnrollments = st.enrollments.map((en) => {
+            const isMatch =
+              en.subjectId === id ||
+              en.subjectName.toLowerCase().trim() === targetSubjectName.toLowerCase().trim() ||
+              en.subjectName.toLowerCase().trim() === (updatedSub.name || '').toLowerCase().trim();
+
+            if (isMatch) {
+              hasSubject = true;
+              // Grade-specific fee override or default fee
+              const newBaseFee =
+                updatedSub.gradeFees && updatedSub.gradeFees[studentGrade] !== undefined
+                  ? updatedSub.gradeFees[studentGrade]
+                  : (updatedSub.defaultFee !== undefined ? updatedSub.defaultFee : en.monthlyFee);
+
+              const discount = en.discount || 0;
+              const newFinalFee = Math.max(0, newBaseFee - discount);
+
+              return {
+                ...en,
+                subjectId: id,
+                subjectName: updatedSub.name || en.subjectName,
+                monthlyFee: newBaseFee,
+                finalFee: newFinalFee,
+              };
+            }
+            return en;
+          });
+
+          if (!hasSubject) {
+            return st;
+          }
+
+          affectedStudentsCount++;
+
+          const effectiveDiscountPercent = st.tuitionWaived
+            ? 100
+            : (st.tuitionDiscountPercent || 0);
+          const effectiveWaived = effectiveDiscountPercent === 100;
+
+          const { totalTuitionDue, remainingDebt } = calculateStudentFees(
+            updatedEnrollments,
+            st.totalPaid,
+            effectiveWaived,
+            effectiveDiscountPercent
+          );
+
+          return {
+            ...st,
+            enrollments: updatedEnrollments,
+            totalTuitionDue,
+            remainingDebt,
+          };
+        })
+      );
+
+      // 2. Update active / unsettled invoices containing this subject
+      setInvoices((prevInvoices) =>
+        prevInvoices.map((inv) => {
+          if (inv.isSettled) return inv;
+
+          let hasMatchingLineItem = false;
+          const invGrade = inv.grade || 8;
+
+          const updatedLineItems = inv.lineItems.map((li) => {
+            const isMatch =
+              li.subjectId === id ||
+              li.subjectName.toLowerCase().trim() === targetSubjectName.toLowerCase().trim() ||
+              li.subjectName.toLowerCase().trim() === (updatedSub.name || '').toLowerCase().trim();
+
+            if (isMatch) {
+              hasMatchingLineItem = true;
+              const newAmount =
+                updatedSub.gradeFees && updatedSub.gradeFees[invGrade] !== undefined
+                  ? updatedSub.gradeFees[invGrade]
+                  : (updatedSub.defaultFee !== undefined ? updatedSub.defaultFee : li.amount);
+
+              const paidAmount = li.paidAmount || 0;
+              const remainingAmount = Math.max(0, newAmount - paidAmount);
+              const status =
+                remainingAmount === 0
+                  ? ('paid' as const)
+                  : paidAmount > 0
+                  ? ('partial' as const)
+                  : ('unpaid' as const);
+
+              return {
+                ...li,
+                subjectId: id,
+                subjectName: updatedSub.name || li.subjectName,
+                amount: newAmount,
+                remainingAmount,
+                status,
+              };
+            }
+            return li;
+          });
+
+          if (!hasMatchingLineItem) return inv;
+
+          const newTotalAmount = updatedLineItems.reduce((sum, li) => sum + li.amount, 0);
+          const newPaidAmount = inv.paidAmount;
+          const newRemainingAmount = Math.max(0, newTotalAmount - newPaidAmount);
+          const newStatus =
+            newRemainingAmount === 0
+              ? ('paid' as const)
+              : newPaidAmount > 0
+              ? ('partial' as const)
+              : ('unpaid' as const);
+
+          return {
+            ...inv,
+            totalAmount: newTotalAmount,
+            remainingAmount: newRemainingAmount,
+            status: newStatus,
+            lineItems: updatedLineItems,
+          };
+        })
+      );
+
+      logAuditEvent({
+        action: 'UPDATE',
+        entity: 'subject_pricing',
+        description: `Thay đổi học phí môn ${updatedSub.name} -> Tự động cập nhật học phí cho toàn bộ học sinh (${affectedStudentsCount} HS) và hóa đơn chưa quyết toán`,
+        actorId: currentUser?.id || 'system',
+        actorName: currentUser?.fullName || 'Hệ thống Quản Trị',
+        actorRole: currentUser?.role || 'SUPER_ADMIN',
+        severity: 'info',
+      });
+
+      showGlobalToast(
+        `Đã tự động cập nhật mức học phí mới của môn "${updatedSub.name}" cho tất cả học sinh đang theo học theo từng khối lớp!`,
+        'success'
+      );
+    }
+  };
+
+  const deleteSubject = (id: string) => {
+    const subToDelete = subjects.find((s) => s.id === id);
+    setSubjects((prev) => prev.filter((s) => s.id !== id));
+    if (subToDelete) {
+      logAuditEvent({
+        action: 'DELETE',
+        entity: 'subject_pricing',
+        description: `Xóa môn học ${subToDelete.name}`,
+        actorId: currentUser?.id || 'system',
+        actorName: currentUser?.fullName || 'Hệ thống Quản Trị',
+        actorRole: currentUser?.role || 'SUPER_ADMIN',
+        severity: 'warning',
+      });
+    }
   };
 
   const addLead = (leadData: Omit<ParentLead, 'id' | 'code' | 'timeline' | 'createdAt'>): ParentLead => {
@@ -1164,20 +1567,301 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString().split('T')[0],
     };
     setTutors((prev) => [newTutor, ...prev]);
+
+    // Auto-sync tutor to user accounts in Admin / Operations
+    const username = (newTutor.code || `gv_${newTutor.id.slice(-4)}`).toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const autoUser: AuthUser = {
+      id: `usr-tut-${newTutor.id}`,
+      username,
+      fullName: newTutor.fullName,
+      email: newTutor.email || `${username}@antam.edu.vn`,
+      phone: newTutor.phone,
+      role: 'TEACHER',
+      title: newTutor.major ? `Giáo viên ${newTutor.major}` : 'Giáo viên bộ môn',
+      department: newTutor.university || 'Tổ Tự Nhiên & Xã Hội',
+      teachingSubjects: newTutor.subjectsCanTeach,
+      assignedClasses: newTutor.gradesCanTeach?.map((g) => `Khối ${g}`),
+      password: '123',
+      isActive: true,
+      createdAt: newTutor.createdAt,
+      lastLogin: 'Chưa đăng nhập',
+    };
+    setUsers((prevUsers) => {
+      if (prevUsers.some((u) => u.id === autoUser.id || (u.phone && u.phone === autoUser.phone))) {
+        return prevUsers;
+      }
+      return [autoUser, ...prevUsers];
+    });
+  };
+
+  const updateTutor = (id: string, updates: Partial<TutorAssistant>) => {
+    setTutors((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+
+    // Auto-sync updates to user accounts in Admin / Operations
+    setUsers((prevUsers) =>
+      prevUsers.map((u) => {
+        if (u.id === `usr-tut-${id}` || (updates.phone && u.phone === updates.phone)) {
+          return {
+            ...u,
+            fullName: updates.fullName !== undefined ? updates.fullName : u.fullName,
+            phone: updates.phone !== undefined ? updates.phone : u.phone,
+            email: updates.email !== undefined ? updates.email : u.email,
+            department: updates.university !== undefined ? updates.university : u.department,
+            teachingSubjects: updates.subjectsCanTeach !== undefined ? updates.subjectsCanTeach : u.teachingSubjects,
+            assignedClasses: updates.gradesCanTeach !== undefined ? updates.gradesCanTeach.map((g) => `Khối ${g}`) : u.assignedClasses,
+          };
+        }
+        return u;
+      })
+    );
   };
 
   const updateTutorStatus = (id: string, status: TutorStatus) => {
     setTutors((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
+    // Auto sync active state to user account
+    const isActive = status !== 'ended' && status !== 'rejected';
+    setUsers((prevUsers) =>
+      prevUsers.map((u) => {
+        if (u.id === `usr-tut-${id}`) {
+          return { ...u, isActive };
+        }
+        return u;
+      })
+    );
   };
 
   const deleteTutor = (id: string) => {
     setTutors((prev) => prev.filter((t) => t.id !== id));
+    setUsers((prevUsers) => prevUsers.filter((u) => u.id !== `usr-tut-${id}`));
   };
 
   const deleteTutors = (ids: string[]) => {
     if (!ids || ids.length === 0) return;
     const targetSet = new Set(ids);
     setTutors((prev) => prev.filter((t) => !targetSet.has(t.id)));
+    setUsers((prevUsers) => prevUsers.filter((u) => !targetSet.has(u.id.replace('usr-tut-', ''))));
+  };
+
+  // Comprehensive Cross-Module Academic -> Operations Synchronization
+  const syncAcademicToOperations = () => {
+    let syncedTutors = 0;
+    let syncedStudents = 0;
+    let syncedInvoices = 0;
+
+    // 1. Sync Teachers & Staff (users with TEACHER / TUTOR role) -> Tutors (Đội Ngũ Thầy Cô & Trợ Giảng)
+    setTutors((prevTutors) => {
+      const updatedTutors = [...prevTutors];
+      const teacherUsers = users.filter((u) => u.role === 'TEACHER' || u.role === 'TUTOR');
+
+      teacherUsers.forEach((teacher) => {
+        const existingIdx = updatedTutors.findIndex(
+          (t) =>
+            t.fullName.toLowerCase().trim() === teacher.fullName.toLowerCase().trim() ||
+            (teacher.phone && t.phone === teacher.phone) ||
+            (teacher.email && t.email.toLowerCase() === teacher.email.toLowerCase()) ||
+            t.id === `tut-${teacher.id}` ||
+            t.id === teacher.id
+        );
+
+        const mappedSubjects = (teacher.teachingSubjects || []).map((sId) => {
+          const matched = subjects.find((s) => s.id === sId);
+          return matched ? matched.name : sId;
+        });
+        const finalSubjects = mappedSubjects.length > 0 ? mappedSubjects : ['Toán học'];
+
+        if (existingIdx >= 0) {
+          const current = updatedTutors[existingIdx];
+          updatedTutors[existingIdx] = {
+            ...current,
+            fullName: teacher.fullName,
+            phone: teacher.phone || current.phone,
+            email: teacher.email || current.email,
+            university: current.university || teacher.department || 'ĐH Sư Phạm Hà Nội',
+            major: current.major || teacher.title || 'Sư phạm chất lượng cao',
+            subjectsCanTeach: current.subjectsCanTeach.length > 0 ? current.subjectsCanTeach : finalSubjects,
+            status: teacher.isActive ? 'active_contract' : 'ended',
+          };
+          syncedTutors++;
+        } else {
+          const newTut: TutorAssistant = {
+            id: `tut-${teacher.id}`,
+            code: `GV-2026-${String(updatedTutors.length + 1).padStart(2, '0')}`,
+            fullName: teacher.fullName,
+            gender:
+              teacher.fullName.toLowerCase().includes('cô') ||
+              teacher.fullName.toLowerCase().includes('nữ')
+                ? 'Nữ'
+                : 'Nam',
+            phone: teacher.phone || '0900000000',
+            email: teacher.email || `gv.${teacher.id}@antam.edu.vn`,
+            university: teacher.department || 'Đại học Sư Phạm Hà Nội',
+            major: teacher.title || 'Giáo viên bộ môn chuyên sâu',
+            subjectsCanTeach: finalSubjects,
+            gradesCanTeach: [6, 7, 8, 9],
+            experienceYears: 6,
+            bio: `${teacher.title || 'Giáo viên bộ môn'} • ${teacher.department || 'Tổ Tự Nhiên & Xã Hội'}. Giảng dạy và cố vấn chuyên môn tại An Tâm Education.`,
+            expectations: 'Giảng dạy chính thức và đồng bộ lương/chi trả theo môn học.',
+            hourlyRate: 350000,
+            rating: 5.0,
+            status: teacher.isActive ? 'active_contract' : 'ended',
+            availability: {
+              2: { shift1: true, shift2: true, shift3: true, shift4: true },
+              3: { shift1: true, shift2: true, shift3: true, shift4: true },
+              4: { shift1: true, shift2: true, shift3: true, shift4: true },
+              5: { shift1: true, shift2: true, shift3: true, shift4: true },
+              6: { shift1: true, shift2: true, shift3: true, shift4: true },
+              7: { shift1: true, shift2: true, shift3: true, shift4: true },
+              8: { shift1: true, shift2: true, shift3: true, shift4: false },
+            },
+            createdAt: teacher.createdAt || new Date().toISOString().split('T')[0],
+          };
+          updatedTutors.unshift(newTut);
+          syncedTutors++;
+        }
+      });
+
+      return updatedTutors;
+    });
+
+    // 2. Sync Tutors -> Auth Users (TEACHER / TUTOR accounts)
+    setUsers((prevUsers) => {
+      const updatedUsers = [...prevUsers];
+      tutors.forEach((tut) => {
+        const existingIdx = updatedUsers.findIndex(
+          (u) =>
+            u.id === `usr-tut-${tut.id}` ||
+            (tut.phone && u.phone === tut.phone) ||
+            (tut.email && u.email.toLowerCase() === tut.email.toLowerCase()) ||
+            u.fullName.toLowerCase().trim() === tut.fullName.toLowerCase().trim()
+        );
+
+        if (existingIdx >= 0) {
+          const current = updatedUsers[existingIdx];
+          updatedUsers[existingIdx] = {
+            ...current,
+            fullName: tut.fullName,
+            phone: tut.phone || current.phone,
+            email: tut.email || current.email,
+            role: current.role === 'SUPER_ADMIN' || current.role === 'ADMIN' ? current.role : 'TEACHER',
+            department: tut.university || current.department,
+            teachingSubjects: tut.subjectsCanTeach,
+            assignedClasses: tut.gradesCanTeach?.map((g) => `Khối ${g}`),
+            isActive: tut.status !== 'ended' && tut.status !== 'rejected',
+          };
+          syncedTutors++;
+        } else {
+          const username = (tut.code || `gv_${tut.id.slice(-4)}`).toLowerCase().replace(/[^a-z0-9_]/g, '_');
+          const newUser: AuthUser = {
+            id: `usr-tut-${tut.id}`,
+            username,
+            fullName: tut.fullName,
+            email: tut.email || `${username}@antam.edu.vn`,
+            phone: tut.phone,
+            role: 'TEACHER',
+            title: tut.major ? `Giáo viên ${tut.major}` : 'Giáo viên bộ môn',
+            department: tut.university || 'Tổ Tự Nhiên & Xã Hội',
+            teachingSubjects: tut.subjectsCanTeach,
+            assignedClasses: tut.gradesCanTeach?.map((g) => `Khối ${g}`),
+            password: '123',
+            isActive: tut.status !== 'ended' && tut.status !== 'rejected',
+            createdAt: tut.createdAt || new Date().toISOString().split('T')[0],
+            lastLogin: 'Chưa đăng nhập',
+          };
+          updatedUsers.push(newUser);
+          syncedTutors++;
+        }
+      });
+      return updatedUsers;
+    });
+
+    // 2. Sync Students -> Invoices (Thu Phí & Học Phí)
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+
+    setInvoices((prevInvoices) => {
+      const updatedInvoices = [...prevInvoices];
+      students.forEach((st) => {
+        syncedStudents++;
+        const effectiveDiscount = st.tuitionWaived ? 100 : (st.tuitionDiscountPercent || 0);
+        const effectiveWaived = effectiveDiscount === 100;
+        const grossFee = st.enrollments.reduce((sum, e) => sum + (e.finalFee || 0), 0);
+        const targetFee = effectiveWaived ? 0 : Math.round(grossFee * (1 - effectiveDiscount / 100));
+
+        const existingInvIdx = updatedInvoices.findIndex(
+          (inv) => inv.studentId === st.id && inv.month === currentMonth && inv.year === currentYear
+        );
+
+        if (existingInvIdx >= 0) {
+          const inv = updatedInvoices[existingInvIdx];
+          if (!inv.isSettled) {
+            const lineItems = st.enrollments.map((en) => ({
+              subjectId: en.subjectId,
+              subjectName: en.subjectName,
+              amount: en.finalFee,
+              status: inv.paidAmount >= targetFee ? ('paid' as const) : ('unpaid' as const),
+            }));
+            const remaining = Math.max(0, targetFee - inv.paidAmount);
+            const status = remaining === 0 ? ('paid' as const) : inv.paidAmount > 0 ? ('partial' as const) : ('unpaid' as const);
+
+            updatedInvoices[existingInvIdx] = {
+              ...inv,
+              studentName: st.fullName,
+              studentCode: st.code,
+              grade: st.grade,
+              totalAmount: targetFee,
+              remainingAmount: remaining,
+              status,
+              lineItems,
+            };
+            syncedInvoices++;
+          }
+        } else if (targetFee > 0 || st.enrollments.length > 0) {
+          const newInvoice: InvoiceRecord = {
+            id: `inv-${Date.now()}-${st.id.slice(-4)}`,
+            invoiceCode: `INV-${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(updatedInvoices.length + 1).padStart(3, '0')}`,
+            studentId: st.id,
+            studentName: st.fullName,
+            studentCode: st.code,
+            grade: st.grade,
+            month: currentMonth,
+            year: currentYear,
+            dueDate: `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`,
+            totalAmount: targetFee,
+            paidAmount: 0,
+            remainingAmount: targetFee,
+            status: targetFee === 0 ? 'paid' : 'unpaid',
+            lineItems: st.enrollments.map((en) => ({
+              subjectId: en.subjectId,
+              subjectName: en.subjectName,
+              amount: en.finalFee,
+              status: targetFee === 0 ? 'paid' : 'unpaid',
+            })),
+            paymentHistory: [],
+            createdAt: new Date().toISOString().split('T')[0],
+          };
+          updatedInvoices.push(newInvoice);
+          syncedInvoices++;
+        }
+      });
+      return updatedInvoices;
+    });
+
+    logAuditEvent({
+      action: 'UPDATE',
+      entity: 'system_sync',
+      description: `Đồng bộ dữ liệu Học Tập -> Vận Hành: ${syncedTutors} giáo viên, ${syncedStudents} học sinh, ${syncedInvoices} hóa đơn`,
+      actorId: currentUser?.id || 'system',
+      actorName: currentUser?.fullName || 'Hệ thống Quản Trị',
+      actorRole: currentUser?.role || 'SUPER_ADMIN',
+      severity: 'info',
+    });
+
+    showGlobalToast(
+      `Đồng bộ hoàn tất: Đã liên kết ${syncedTutors} thầy cô/trợ giảng và cập nhật ${syncedStudents} học sinh vào Quản trị & Vận hành!`,
+      'success'
+    );
+
+    return { syncedTutors, syncedStudents, syncedInvoices };
   };
 
   const addScheduleSession = (sessionData: Omit<ScheduleSession, 'id'>): ScheduleSession => {
@@ -1592,17 +2276,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteStudents,
         addPayment,
         createInvoice,
+        createMonthlyInvoices,
+        settleMonthlyInvoices,
+        updateInvoiceLineItem,
         addExpense,
         deleteExpense,
         addSubject,
         updateSubject,
+        deleteSubject,
         addLead,
         updateLeadStatus,
         convertLeadToStudent,
         addTutor,
+        updateTutor,
         updateTutorStatus,
         deleteTutor,
         deleteTutors,
+        syncAcademicToOperations,
         addScheduleSession,
         updateScheduleSession,
         deleteScheduleSession,

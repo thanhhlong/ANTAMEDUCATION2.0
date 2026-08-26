@@ -18,7 +18,9 @@ import {
   ArrowRight,
   Info,
   Layers,
-  BookOpen
+  BookOpen,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 
 interface PayrollRecord {
@@ -49,10 +51,76 @@ interface PayoutBlock {
 }
 
 export const TeacherPayroll: React.FC = () => {
-  const { users, subjects, students } = useApp();
+  const { users, subjects, students, tutors, addExpense, showGlobalToast, syncAcademicToOperations } = useApp();
 
-  // Get only users who are Teachers
-  const teachers = users.filter(u => u.role === 'TEACHER');
+  // Combine teachers from both academic tutors and auth accounts
+  const teachers = React.useMemo(() => {
+    const list: {
+      id: string;
+      fullName: string;
+      code: string;
+      phone: string;
+      email?: string;
+      title?: string;
+      department?: string;
+      teachingSubjects: string[];
+      gradesCanTeach?: number[];
+      hourlyRate?: number;
+      university?: string;
+      source: 'tutor' | 'user';
+    }[] = [];
+
+    const addedNames = new Set<string>();
+
+    // 1. All teachers & assistants from TutorManager (Academic)
+    tutors.forEach((tut) => {
+      // Map subject names to IDs or retain existing
+      const mappedSubjects = (tut.subjectsCanTeach || []).map((subName) => {
+        const found = subjects.find(
+          (s) => s.name.toLowerCase() === subName.toLowerCase() || s.id === subName
+        );
+        return found ? found.id : subName;
+      });
+
+      list.push({
+        id: tut.id,
+        fullName: tut.fullName,
+        code: tut.code,
+        phone: tut.phone,
+        email: tut.email,
+        title: tut.major ? `Giáo viên ${tut.major}` : 'Giáo viên bộ môn',
+        department: tut.university || 'Tổ Tự Nhiên & Xã Hội',
+        teachingSubjects: mappedSubjects.length > 0 ? mappedSubjects : [subjects[0]?.id || ''],
+        gradesCanTeach: tut.gradesCanTeach,
+        hourlyRate: tut.hourlyRate,
+        university: tut.university,
+        source: 'tutor',
+      });
+      addedNames.add(tut.fullName.toLowerCase().trim());
+    });
+
+    // 2. Add any teacher accounts from users not already listed
+    users
+      .filter((u) => u.role === 'TEACHER' || u.role === 'TUTOR')
+      .forEach((u) => {
+        if (!addedNames.has(u.fullName.toLowerCase().trim())) {
+          list.push({
+            id: u.id,
+            fullName: u.fullName,
+            code: u.username || `GV-${u.id.slice(-4)}`,
+            phone: u.phone || '',
+            email: u.email,
+            title: u.title || 'Giáo viên bộ môn',
+            department: u.department || 'Tổ Tự Nhiên & Xã Hội',
+            teachingSubjects: u.teachingSubjects || [subjects[0]?.id || ''],
+            source: 'user',
+          });
+          addedNames.add(u.fullName.toLowerCase().trim());
+        }
+      });
+
+    return list;
+  }, [tutors, users, subjects]);
 
   // Load / Save Payroll records from localStorage
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>(() => {
@@ -349,7 +417,22 @@ export const TeacherPayroll: React.FC = () => {
     };
 
     setPayrollRecords([newRecord, ...payrollRecords]);
-    alert(`Đã ghi nhận chi trả thành công cho ${selectedTeacherObj.fullName} số tiền ${formatCurrency(recordPaidAmount)}!`);
+
+    // Auto-sync payout into Operating Expenses (Chi Phí Vận Hành)
+    if (recordPaidAmount > 0) {
+      addExpense({
+        date: new Date().toISOString().split('T')[0],
+        category: 'salary',
+        categoryName: 'Lương & Thù lao giảng dạy',
+        amount: recordPaidAmount,
+        payer: 'Thủ quỹ Trung tâm',
+        status: 'paid',
+        description: `Chi trả thù lao giảng dạy cho ${selectedTeacherObj.fullName} - ${subjectsDisplayString} (Tháng ${calcMonth}/${calcYear})`,
+        notes: calcNotes || `Đồng bộ từ bảng lương Chi Trả Giáo Viên.`
+      });
+    }
+
+    showGlobalToast(`Đã ghi nhận chi trả và đồng bộ chi phí cho ${selectedTeacherObj.fullName} số tiền ${formatCurrency(recordPaidAmount)}!`, 'success');
     
     // Clear state
     setCustomStudentFees({});
@@ -407,40 +490,55 @@ export const TeacherPayroll: React.FC = () => {
           </p>
         </div>
 
-        {/* Sub Navigation Tabs */}
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/60 self-start">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Sub Navigation Tabs */}
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/60 self-start">
+            <button
+              onClick={() => setActiveSubTab('overview')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                activeSubTab === 'overview' 
+                  ? 'bg-white text-emerald-700 shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Công Dồn & Thanh Toán</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('calculator')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                activeSubTab === 'calculator' 
+                  ? 'bg-white text-emerald-700 shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Tính Lương & Trả Phí</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('history')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                activeSubTab === 'history' 
+                  ? 'bg-white text-emerald-700 shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Lịch Sử Ghi Sổ</span>
+            </button>
+          </div>
+
           <button
-            onClick={() => setActiveSubTab('overview')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-              activeSubTab === 'overview' 
-                ? 'bg-white text-emerald-700 shadow-xs' 
-                : 'text-slate-600 hover:text-slate-950'
-            }`}
+            onClick={() => {
+              if (syncAcademicToOperations) {
+                syncAcademicToOperations();
+              }
+            }}
+            title="Đồng bộ danh sách giáo viên & học sinh từ phần Học Tập"
+            className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
           >
-            <Users className="w-3.5 h-3.5" />
-            <span>Công Dồn & Thanh Toán</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('calculator')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-              activeSubTab === 'calculator' 
-                ? 'bg-white text-emerald-700 shadow-xs' 
-                : 'text-slate-600 hover:text-slate-950'
-            }`}
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>Tính Lương & Trả Phí</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('history')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-              activeSubTab === 'history' 
-                ? 'bg-white text-emerald-700 shadow-xs' 
-                : 'text-slate-600 hover:text-slate-950'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>Lịch Sử Ghi Sổ</span>
+            <RefreshCw className="w-3.5 h-3.5 text-emerald-600 animate-spin-hover" />
+            <span>Đồng Bộ Dữ Liệu Học Tập</span>
           </button>
         </div>
       </div>

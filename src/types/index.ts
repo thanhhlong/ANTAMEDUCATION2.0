@@ -47,6 +47,8 @@ export interface StudentEnrollment {
   status: 'active' | 'dropped';
   classId?: string;
   notes?: string;
+  lastPaidDate?: string; // Ngày nộp tiền gần nhất của môn học này
+  paidStatus?: 'paid' | 'partial' | 'unpaid';
 }
 
 export interface Student {
@@ -81,6 +83,16 @@ export interface Student {
   tuitionWaived?: boolean; // Tương đương 100% miễn học phí
 }
 
+export type PaymentMode = 'full' | 'per_subject'; // 'full' (Nộp tổng tất cả môn) | 'per_subject' (Nộp từng môn riêng biệt)
+
+export interface SubjectPaymentItem {
+  subjectId: string;
+  subjectName: string;
+  amount: number;
+  paidDate?: string; // Ngày nộp của môn
+  notes?: string;
+}
+
 export interface PaymentTransaction {
   id: string;
   invoiceId: string;
@@ -93,6 +105,20 @@ export interface PaymentTransaction {
   collectedBy: string;
   notes?: string;
   receiptUrl?: string;
+  paymentMode?: PaymentMode;
+  subjectBreakdown?: SubjectPaymentItem[];
+}
+
+export interface InvoiceLineItem {
+  subjectId: string;
+  subjectName: string;
+  amount: number;
+  paidAmount?: number;
+  remainingAmount?: number;
+  paidDate?: string; // Lưu ngày nộp tiền của từng môn
+  status?: 'paid' | 'partial' | 'unpaid';
+  paymentMode?: PaymentMode;
+  notes?: string;
 }
 
 export interface InvoiceRecord {
@@ -109,15 +135,35 @@ export interface InvoiceRecord {
   paidAmount: number;
   remainingAmount: number;
   status: PaymentStatus;
-  lineItems: {
-    subjectId: string;
-    subjectName: string;
-    amount: number;
-  }[];
+  lineItems: InvoiceLineItem[];
   paymentHistory: PaymentTransaction[];
   notes?: string;
   createdAt: string;
   lastReminderSentAt?: string;
+  isSettled?: boolean; // Đã quyết toán tháng
+  settledDate?: string;
+}
+
+export interface MonthlySettlementRecord {
+  id: string;
+  month: number;
+  year: number;
+  totalStudents: number;
+  totalDue: number;
+  totalPaid: number;
+  totalDebt: number;
+  collectionRate: number;
+  closedAt?: string;
+  closedBy?: string;
+  status: 'open' | 'reconciled' | 'closed';
+  subjectStats: {
+    subjectId: string;
+    subjectName: string;
+    studentCount: number;
+    expectedFee: number;
+    collectedFee: number;
+    debtFee: number;
+  }[];
 }
 
 export type ExpenseCategory =

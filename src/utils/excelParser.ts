@@ -1113,27 +1113,124 @@ export function exportTuitionStudentsExcel(
     filtered = filtered.filter((s) => s.totalPaid > 0 && s.remainingDebt > 0);
   }
 
-  const exportData = filtered.map((s, idx) => ({
-    'STT': idx + 1,
-    'Mã học sinh': s.code,
-    'Họ và tên': s.fullName,
-    'Khối': `Khối ${s.grade}`,
-    'Lớp': s.className,
-    'Số điện thoại': s.phone || '',
-    'Phụ huynh': s.parentName,
-    'SĐT Phụ huynh': s.parentPhone || '',
-    'Môn học': s.enrollments.map((e) => e.subjectName).join(', '),
-    'Học phí phải thu (VNĐ)': s.totalTuitionDue,
-    'Đã nộp (VNĐ)': s.totalPaid,
-    'Còn nợ (VNĐ)': s.remainingDebt,
-    'Trạng thái': s.remainingDebt === 0 ? 'Đã hoàn thành' : s.totalPaid > 0 ? 'Đóng thiếu' : 'Chưa nộp',
-    'Ghi chú': s.notes || '',
-  }));
+  const exportData = filtered.map((s, idx) => {
+    const matchingInvoice = invoices.find(
+      (inv) => inv.studentId === s.id && inv.month === options.month && inv.year === options.year
+    ) || invoices.find((inv) => inv.studentId === s.id);
+
+    const subjectDetailStr = matchingInvoice && matchingInvoice.lineItems
+      ? matchingInvoice.lineItems
+          .map(
+            (li) =>
+              `${li.subjectName}: ${li.paidAmount || 0}/${li.amount}đ ${
+                li.paidDate ? `(Ngày nộp: ${li.paidDate})` : '(Chưa nộp)'
+              }`
+          )
+          .join(' | ')
+      : s.enrollments.map((e) => `${e.subjectName}: ${e.finalFee}đ`).join(', ');
+
+    return {
+      'STT': idx + 1,
+      'Mã học sinh': s.code,
+      'Họ và tên': s.fullName,
+      'Khối': `Khối ${s.grade}`,
+      'Lớp': s.className,
+      'Số điện thoại': s.phone || '',
+      'Phụ huynh': s.parentName,
+      'SĐT Phụ huynh': s.parentPhone || '',
+      'Chi tiết môn & Ngày nộp': subjectDetailStr,
+      'Học phí phải thu (VNĐ)': s.totalTuitionDue,
+      'Đã nộp (VNĐ)': s.totalPaid,
+      'Còn nợ (VNĐ)': s.remainingDebt,
+      'Trạng thái': s.remainingDebt === 0 ? 'Đã hoàn thành' : s.totalPaid > 0 ? 'Đóng thiếu' : 'Chưa nộp',
+      'Ghi chú': s.notes || '',
+    };
+  });
 
   const fileName = `ANTAM_Hoc_Phi_${options.filterType.toUpperCase()}_K${options.grade}_T${options.month}_${options.year}.xlsx`;
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'DANH SÁCH HỌC PHÍ');
+  XLSX.writeFile(workbook, fileName);
+  return fileName;
+}
+
+export function exportMonthlySettlementExcel(
+  invoices: InvoiceRecord[],
+  month: number,
+  year: number
+): string {
+  const monthInvoices = invoices.filter((inv) => inv.month === month && inv.year === year);
+  const workbook = XLSX.utils.book_new();
+
+  // Sheet 1: TỔNG QUAN QUYẾT TOÁN
+  const totalAmount = monthInvoices.reduce((s, i) => s + i.totalAmount, 0);
+  const totalPaid = monthInvoices.reduce((s, i) => s + i.paidAmount, 0);
+  const totalDebt = monthInvoices.reduce((s, i) => s + i.remainingAmount, 0);
+  const settledCount = monthInvoices.filter((i) => i.isSettled || i.status === 'paid').length;
+
+  const summaryRows = [
+    { 'Chỉ tiêu quyết toán': 'Kỳ quyết toán', 'Giá trị': `Tháng ${month}/${year}` },
+    { 'Chỉ tiêu quyết toán': 'Tổng số hóa đơn phát hành', 'Giá trị': monthInvoices.length },
+    { 'Chỉ tiêu quyết toán': 'Tổng học phí dự thu (VNĐ)', 'Giá trị': totalAmount },
+    { 'Chỉ tiêu quyết toán': 'Tổng học phí thực thu (VNĐ)', 'Giá trị': totalPaid },
+    { 'Chỉ tiêu quyết toán': 'Tổng công nợ còn lại (VNĐ)', 'Giá trị': totalDebt },
+    { 'Chỉ tiêu quyết toán': 'Tỷ lệ thu hồi học phí', 'Giá trị': `${((totalPaid / (totalAmount || 1)) * 100).toFixed(1)}%` },
+    { 'Chỉ tiêu quyết toán': 'Số hóa đơn đã quyết toán/thu đủ', 'Giá trị': `${settledCount}/${monthInvoices.length}` },
+    { 'Chỉ tiêu quyết toán': 'Ngày lập báo cáo', 'Giá trị': new Date().toLocaleDateString('vi-VN') },
+  ];
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), 'TỔNG QUAN QUYẾT TOÁN');
+
+  // Sheet 2: CHI TIẾT TỪNG MÔN HỌC & NGÀY NỘP
+  const lineItemRows: any[] = [];
+  let rowIdx = 1;
+
+  monthInvoices.forEach((inv) => {
+    inv.lineItems.forEach((li) => {
+      lineItemRows.push({
+        'STT': rowIdx++,
+        'Mã hóa đơn': inv.invoiceCode,
+        'Họ tên học sinh': inv.studentName,
+        'Mã HS': inv.studentCode,
+        'Khối': `Khối ${inv.grade}`,
+        'Môn học': li.subjectName,
+        'Học phí môn (VNĐ)': li.amount,
+        'Đã nộp môn (VNĐ)': li.paidAmount || 0,
+        'Còn nợ môn (VNĐ)': li.remainingAmount !== undefined ? li.remainingAmount : (li.amount - (li.paidAmount || 0)),
+        'Ngày nộp tiền': li.paidDate || 'Chưa nộp',
+        'Hình thức nộp': li.paymentMode === 'per_subject' ? 'Nộp từng môn' : li.paymentMode === 'full' ? 'Nộp tổng' : 'Chưa thu',
+        'Trạng thái môn': li.status === 'paid' ? 'Đã thu đủ' : li.status === 'partial' ? 'Nộp một phần' : 'Chưa thu',
+        'Trạng thái HĐ': inv.status === 'paid' ? 'Đã hoàn thành' : inv.status === 'partial' ? 'Đóng thiếu' : 'Chưa nộp',
+        'Quyết toán': inv.isSettled ? `Đã quyết toán (${inv.settledDate || ''})` : 'Chưa khóa sổ',
+      });
+    });
+  });
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(lineItemRows), 'CHI TIẾT TỪNG MÔN & NGÀY NỘP');
+
+  // Sheet 3: LỊCH SỬ GIAO DỊCH THU TIỀN
+  const transactionRows: any[] = [];
+  let txIdx = 1;
+
+  monthInvoices.forEach((inv) => {
+    inv.paymentHistory.forEach((tx) => {
+      transactionRows.push({
+        'STT': txIdx++,
+        'Mã hóa đơn': inv.invoiceCode,
+        'Mã giao dịch': tx.referenceCode || tx.id,
+        'Họ tên học sinh': tx.studentName,
+        'Số tiền nộp (VNĐ)': tx.amount,
+        'Ngày nộp tiền': tx.paymentDate,
+        'Hình thức': tx.paymentMode === 'per_subject' ? 'Nộp từng môn riêng' : 'Nộp tổng',
+        'Phương thức': tx.method === 'bank_transfer' ? 'Chuyển khoản' : tx.method === 'qr_code' ? 'VietQR' : 'Tiền mặt',
+        'Người thu': tx.collectedBy,
+        'Môn nộp cụ thể': tx.subjectBreakdown ? tx.subjectBreakdown.map((s) => `${s.subjectName} (${s.amount}đ, ${s.paidDate || tx.paymentDate})`).join('; ') : 'Nộp tổng toàn bộ môn',
+        'Ghi chú': tx.notes || '',
+      });
+    });
+  });
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(transactionRows), 'LỊCH SỬ THU TIỀN');
+
+  const fileName = `ANTAM_QUYET_TOAN_THANG_${month}_${year}.xlsx`;
   XLSX.writeFile(workbook, fileName);
   return fileName;
 }
@@ -1212,7 +1309,7 @@ export const generateCenterExcelExport = (
     'Trường đại học': t.university,
     'Chuyên ngành': t.major,
     'Môn có thể dạy': t.subjectsCanTeach.join(', '),
-    'Thù lao/buổi': t.hourlyRate,
+    'Kinh nghiệm': `${t.experienceYears || 0} năm`,
     'Đánh giá': t.rating,
   }));
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(tutRows), 'Câu trả lời biểu mẫu 1');

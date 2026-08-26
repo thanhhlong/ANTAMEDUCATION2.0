@@ -25,6 +25,7 @@ import {
   CheckSquare,
   Square,
   MinusSquare,
+  RefreshCw,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -37,6 +38,9 @@ export const RolePermissionManager: React.FC = () => {
     deleteUser,
     deleteUsers,
     toggleUserStatus,
+    tutors,
+    students,
+    syncAcademicToOperations,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'users' | 'matrix' | 'add'>('users');
@@ -229,48 +233,69 @@ export const RolePermissionManager: React.FC = () => {
           </div>
         </div>
 
-        {/* Tab Controls */}
-        <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'users'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <span className="flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" />
-              <span>Danh Sách Tài Khoản ({users.length})</span>
-            </span>
-          </button>
+        {/* Tab Controls & Sync Action */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'users'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                <span>Danh Sách ({users.length})</span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('matrix')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'matrix'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5" />
+                <span>Ma Trận</span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('add')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'add'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Thêm</span>
+              </span>
+            </button>
+          </div>
 
           <button
-            onClick={() => setActiveTab('matrix')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'matrix'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-300 hover:text-white'
-            }`}
+            onClick={() => {
+              if (syncAcademicToOperations) {
+                const res = syncAcademicToOperations();
+                showToast(`Đã đồng bộ ${res.syncedTutors} giáo viên và ${res.syncedStudents} học sinh thành công!`);
+                confetti({
+                  particleCount: 50,
+                  spread: 60,
+                  origin: { y: 0.6 },
+                });
+              }
+            }}
+            className="px-3.5 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/30 text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+            title="Đồng bộ toàn bộ giáo viên và học sinh từ phần Học Tập sang Quản Trị & Vận Hành"
           >
-            <span className="flex items-center gap-1.5">
-              <Settings className="w-3.5 h-3.5" />
-              <span>Ma Trận Phân Quyền</span>
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('add')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'add'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <span className="flex items-center gap-1.5">
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>+ Thêm Tài Khoản</span>
-            </span>
+            <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Đồng Bộ Học Tập ({tutors.length} GV / {students.length} HS)</span>
           </button>
         </div>
       </div>

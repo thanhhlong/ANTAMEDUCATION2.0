@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ParentLead, CustomTutoringNeed } from '../../types';
-import { formatCurrency } from '../../utils/formatters';
 import { matchTutorForCustomRequest, TutorMatchResult } from '../../services/geminiService';
 import {
   Sparkles,
@@ -278,7 +277,7 @@ export const CustomTutoringManager: React.FC<CustomTutoringManagerProps> = ({
                               )}
                             </div>
                             <div className="text-xs text-slate-500 mt-0.5">
-                              {tutorRes.university} • {formatCurrency(tutorRes.hourlyRate)}/giờ
+                              {tutorRes.university}
                             </div>
                           </div>
                         </div>

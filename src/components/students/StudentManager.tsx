@@ -1473,11 +1473,11 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
               </div>
             </div>
 
-            {/* Enrolled subjects & Tuition balance */}
+            {/* Enrolled subjects & Tuition balance with Per-Subject Payment Status & Dates */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Môn Đăng Ký & Học Phí Thực Thu
+                  Môn Đăng Ký & Trạng Thái Đã Nộp Từng Môn
                 </span>
                 <span className="text-sm font-bold text-emerald-600">
                   {viewingStudent.tuitionWaived || (viewingStudent.tuitionDiscountPercent === 100) ? (
@@ -1498,17 +1498,62 @@ export const StudentManager: React.FC<StudentManagerProps> = ({ onOpenPaymentMod
               </div>
 
               <div className="space-y-2">
-                {viewingStudent.enrollments.map((en) => (
-                  <div
-                    key={en.id}
-                    className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between text-xs"
-                  >
-                    <span className="font-semibold text-slate-800">{en.subjectName}</span>
-                    <span className="font-mono text-slate-600">
-                      {formatCurrency(en.finalFee)}
-                    </span>
-                  </div>
-                ))}
+                {(() => {
+                  const studentInvoice = invoices.find((inv) => inv.studentId === viewingStudent.id);
+                  return viewingStudent.enrollments.map((en) => {
+                    const li = studentInvoice?.lineItems?.find((item) => item.subjectId === en.subjectId);
+                    const liPaid = li?.paidAmount !== undefined ? li.paidAmount : (en.paidStatus === 'paid' ? en.finalFee : 0);
+                    const liRemaining = li?.remainingAmount !== undefined ? li.remainingAmount : Math.max(0, en.finalFee - liPaid);
+                    const isPaid = liRemaining === 0;
+                    const isPartial = liPaid > 0 && !isPaid;
+                    const paidDate = li?.paidDate || en.lastPaidDate;
+
+                    return (
+                      <div
+                        key={en.id}
+                        className={`p-2.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs transition-colors ${
+                          isPaid
+                            ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950'
+                            : isPartial
+                            ? 'bg-amber-50/60 border-amber-200 text-amber-950'
+                            : 'bg-white border-slate-200 text-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">{en.subjectName}</span>
+                          <span className="font-mono text-slate-500 text-[11px]">
+                            ({formatCurrency(en.finalFee)})
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                          {isPaid ? (
+                            <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Đã nộp đủ {formatCurrency(liPaid || en.finalFee)}</span>
+                            </span>
+                          ) : isPartial ? (
+                            <span className="inline-flex items-center gap-1 font-semibold text-amber-700">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Đã nộp: {formatCurrency(liPaid)} (Còn nợ: {formatCurrency(liRemaining)})</span>
+                            </span>
+                          ) : (
+                            <span className="font-medium text-rose-600">
+                              Chưa nộp (Còn nợ: {formatCurrency(liRemaining)})
+                            </span>
+                          )}
+
+                          {paidDate && (
+                            <span className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                              <Calendar className="w-2.5 h-2.5 text-indigo-500" />
+                              <span>{paidDate}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
 
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">

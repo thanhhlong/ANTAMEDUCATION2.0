@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export const SubjectManager: React.FC = () => {
-  const { subjects, addSubject, updateSubject } = useApp();
+  const { subjects, addSubject, updateSubject, deleteSubject, students, showGlobalToast } = useApp();
 
   const [activeTab, setActiveTab] = useState<'subjects' | 'curriculum_framework' | 'standards'>('subjects');
 
@@ -321,12 +321,15 @@ export const SubjectManager: React.FC = () => {
       {/* TAB 1: SUBJECTS & FEES TABLE */}
       {activeTab === 'subjects' && (
         <div className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-start gap-2.5 max-w-4xl text-slate-600">
-            <HelpCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs flex items-start gap-2.5 max-w-4xl text-emerald-900 shadow-2xs">
+            <Zap className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <strong className="text-slate-800 block">Định mức học phí chuẩn & phân bổ theo khối:</strong>
-              <p>
-                Mỗi môn học sử dụng <strong>Học phí chuẩn</strong> làm mức cơ sở. Hệ thống áp dụng tự động cho học sinh các khối 6, 7, 8, 9 và đồng bộ sang Hóa đơn, CRM tuyển sinh và Cổng tra cứu phụ huynh.
+              <strong className="text-emerald-950 font-bold block flex items-center gap-1.5">
+                <span>Tự Động Cập Nhật Học Phí Toàn Bộ Học Sinh:</span>
+                <span className="bg-emerald-200/80 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">Auto-Sync On</span>
+              </strong>
+              <p className="text-emerald-800 leading-relaxed">
+                Khi thay đổi <strong>Học phí chuẩn</strong> hoặc <strong>Biểu phí theo khối (6, 7, 8, 9)</strong> của bất kỳ môn học nào, hệ thống sẽ <strong>tự động tính toán lại học phí và cập nhật ngay lập tức cho tất cả học sinh đang theo học</strong> cùng các hóa đơn chưa quyết toán.
               </p>
             </div>
           </div>
@@ -337,6 +340,7 @@ export const SubjectManager: React.FC = () => {
                 <thead>
                   <tr className="bg-slate-50 text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <th className="px-4 py-3.5">Môn Học & Mã Code</th>
+                    <th className="px-4 py-3.5">Học Sinh Đang Học</th>
                     <th className="px-4 py-3.5">Mô Tả & Trọng Tâm</th>
                     <th className="px-4 py-3.5">Học Phí Chuẩn</th>
                     <th className="px-4 py-3.5 text-center bg-emerald-50/40">Khối 6</th>
@@ -354,6 +358,15 @@ export const SubjectManager: React.FC = () => {
                       return { hasOverride, feeValue };
                     };
 
+                    const enrolledStudentsCount = students.filter((st) =>
+                      st.enrollments.some(
+                        (e) =>
+                          (e.subjectId === sub.id ||
+                            e.subjectName.toLowerCase().trim() === sub.name.toLowerCase().trim()) &&
+                          e.status === 'active'
+                      )
+                    ).length;
+
                     return (
                       <tr key={sub.id} className="hover:bg-slate-50/50 transition-colors">
                         {/* Subject info */}
@@ -368,6 +381,14 @@ export const SubjectManager: React.FC = () => {
                               <div className="font-mono text-[10px] text-slate-400 font-bold mt-0.5">{sub.code}</div>
                             </div>
                           </div>
+                        </td>
+
+                        {/* Enrolled Students Badge */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <Users className="w-3 h-3" />
+                            <span>{enrolledStudentsCount} học sinh</span>
+                          </span>
                         </td>
 
                         {/* Description */}
@@ -416,7 +437,7 @@ export const SubjectManager: React.FC = () => {
                         })}
 
                         {/* Actions */}
-                        <td className="px-4 py-4 text-right whitespace-nowrap">
+                        <td className="px-4 py-4 text-right whitespace-nowrap space-x-1">
                           <button
                             onClick={() => handleOpenEdit(sub)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
@@ -424,6 +445,27 @@ export const SubjectManager: React.FC = () => {
                           >
                             <Edit className="w-4 h-4" />
                           </button>
+                          {subjects.length > 1 && (
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Bạn có chắc chắn muốn xóa môn học "${sub.name}"?`
+                                  )
+                                ) {
+                                  deleteSubject(sub.id);
+                                  showGlobalToast(
+                                    `Đã xóa môn học ${sub.name}!`,
+                                    'info'
+                                  );
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Xóa môn học"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );

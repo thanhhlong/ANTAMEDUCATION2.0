@@ -206,12 +206,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       roles: ['SUPER_ADMIN', 'ADMIN'],
     },
     {
-      id: 'system_architecture',
-      label: 'Kiến Trúc Hệ Thống 3.0',
-      icon: Network,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'ACCOUNTANT'],
-    },
-    {
       id: 'audit_log',
       label: 'Nhật Ký & Kiểm Toán',
       icon: FileText,

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { InvoiceRecord } from '../../types';
+import { InvoiceRecord, InvoiceLineItem } from '../../types';
 import { formatCurrency, formatShortCurrency } from '../../utils/formatters';
-import { exportTuitionStudentsExcel } from '../../utils/excelParser';
+import { exportTuitionStudentsExcel, exportMonthlySettlementExcel } from '../../utils/excelParser';
 import { TuitionExportModal } from './TuitionExportModal';
 import {
   CreditCard,
@@ -19,6 +19,17 @@ import {
   FileSpreadsheet,
   Download,
   Check,
+  Calendar,
+  Layers,
+  Lock,
+  Unlock,
+  Sparkles,
+  PieChart,
+  Clock,
+  BookOpen,
+  ArrowRight,
+  TrendingUp,
+  RefreshCw,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -35,15 +46,20 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
     setSelectedGrade,
     addSubject,
     updateSubject,
+    createMonthlyInvoices,
+    settleMonthlyInvoices,
+    syncAcademicToOperations,
   } = useApp();
 
+  const [selectedMonth, setSelectedMonth] = useState<number | 'all'>(8);
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid' | 'overdue'>('all');
-  const [activeTab, setActiveTab] = useState<'invoices' | 'debtors' | 'pricing'>('invoices');
+  const [activeTab, setActiveTab] = useState<'invoices' | 'debtors' | 'settlement' | 'pricing'>('invoices');
 
   // Secondary sub-tab for pricing: standard default or grade-specific overrides
   const [pricingSubTab, setPricingSubTab] = useState<'standard' | 'grade_adjusted'>('grade_adjusted');
-  const [editingGrade, setEditingGrade] = useState<number>(8); // Default to Grade 8
+  const [editingGrade, setEditingGrade] = useState<number>(8);
   const [feeInputs, setFeeInputs] = useState<{ [key: string]: string }>({});
 
   // Initialize input values for the selected grade
@@ -87,9 +103,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
     delete updatedGradeFees[editingGrade];
 
     updateSubject(subjectId, { gradeFees: updatedGradeFees });
-    
-    // Clear local input
-    setFeeInputs(prev => ({ ...prev, [subjectId]: '' }));
+    setFeeInputs((prev) => ({ ...prev, [subjectId]: '' }));
     alert(`Đã khôi phục học phí môn ${sub.name} về mức mặc định cho Khối ${editingGrade}.`);
   };
 
@@ -109,6 +123,12 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
   const [newSubjectFee, setNewSubjectFee] = useState(400000);
   const [newSubjectColor, setNewSubjectColor] = useState('#3B82F6');
 
+  // Monthly invoice generation modal
+  const [isGenModalOpen, setIsGenModalOpen] = useState(false);
+  const [genMonth, setGenMonth] = useState<number>(9);
+  const [genYear, setGenYear] = useState<number>(2026);
+  const [genDueDate, setGenDueDate] = useState<string>('2026-09-15');
+
   const handleOpenAddSubject = () => {
     setEditingSubjectId(null);
     setNewSubjectName('');
@@ -125,40 +145,118 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
     setIsSubjectModalOpen(true);
   };
 
-  // Filter invoices
-  const filtered = invoices.filter((inv) => {
-    if (selectedGrade !== 'all' && inv.grade !== selectedGrade) return false;
-    if (activeTab === 'debtors' && inv.remainingAmount <= 0) return false;
-    if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = inv.studentName.toLowerCase().includes(q);
-      const matchCode = inv.studentCode.toLowerCase().includes(q);
-      const matchInv = inv.invoiceCode.toLowerCase().includes(q);
-      if (!matchName && !matchCode && !matchInv) return false;
-    }
-    return true;
-  });
+  // Filter invoices based on Grade, Month, Year, Search & Status
+  const filtered = useMemo(() => {
+    return invoices.filter((inv) => {
+      if (selectedMonth !== 'all' && inv.month !== selectedMonth) return false;
+      if (inv.year !== selectedYear) return false;
+      if (selectedGrade !== 'all' && inv.grade !== selectedGrade) return false;
+      if (activeTab === 'debtors' && inv.remainingAmount <= 0) return false;
+      if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = inv.studentName.toLowerCase().includes(q);
+        const matchCode = inv.studentCode.toLowerCase().includes(q);
+        const matchInv = inv.invoiceCode.toLowerCase().includes(q);
+        if (!matchName && !matchCode && !matchInv) return false;
+      }
+      return true;
+    });
+  }, [invoices, selectedMonth, selectedYear, selectedGrade, activeTab, statusFilter, searchQuery]);
 
-  const totalDue = invoices.reduce((acc, i) => acc + i.totalAmount, 0);
-  const totalPaid = invoices.reduce((acc, i) => acc + i.paidAmount, 0);
-  const totalDebt = invoices.reduce((acc, i) => acc + i.remainingAmount, 0);
+  const totalDue = filtered.reduce((acc, i) => acc + i.totalAmount, 0);
+  const totalPaid = filtered.reduce((acc, i) => acc + i.paidAmount, 0);
+  const totalDebt = filtered.reduce((acc, i) => acc + i.remainingAmount, 0);
 
-  const debtorsList = invoices.filter((i) => i.remainingAmount > 0);
-  const paidList = invoices.filter((i) => i.status === 'paid');
+  const debtorsList = filtered.filter((i) => i.remainingAmount > 0);
+  const paidList = filtered.filter((i) => i.status === 'paid');
+
+  // Monthly settlement statistics for the selected month
+  const settlementMonthInvoices = useMemo(() => {
+    const m = selectedMonth === 'all' ? 8 : selectedMonth;
+    return invoices.filter((inv) => inv.month === m && inv.year === selectedYear);
+  }, [invoices, selectedMonth, selectedYear]);
+
+  const settlementStats = useMemo(() => {
+    const total = settlementMonthInvoices.reduce((acc, i) => acc + i.totalAmount, 0);
+    const paid = settlementMonthInvoices.reduce((acc, i) => acc + i.paidAmount, 0);
+    const debt = settlementMonthInvoices.reduce((acc, i) => acc + i.remainingAmount, 0);
+    const isAllSettled = settlementMonthInvoices.length > 0 && settlementMonthInvoices.every((i) => i.isSettled || i.status === 'paid');
+    const fullyPaidCount = settlementMonthInvoices.filter((i) => i.status === 'paid').length;
+    const partialCount = settlementMonthInvoices.filter((i) => i.status === 'partial').length;
+    const unpaidCount = settlementMonthInvoices.filter((i) => i.status === 'unpaid' || i.status === 'overdue').length;
+
+    // Per subject breakdown in settlement
+    const subjectStatsMap: { [subjectId: string]: { name: string; totalDue: number; totalPaid: number; studentCount: number; paidCount: number } } = {};
+
+    settlementMonthInvoices.forEach((inv) => {
+      inv.lineItems.forEach((li) => {
+        if (!subjectStatsMap[li.subjectId]) {
+          subjectStatsMap[li.subjectId] = {
+            name: li.subjectName,
+            totalDue: 0,
+            totalPaid: 0,
+            studentCount: 0,
+            paidCount: 0,
+          };
+        }
+        subjectStatsMap[li.subjectId].totalDue += li.amount;
+        subjectStatsMap[li.subjectId].totalPaid += li.paidAmount || 0;
+        subjectStatsMap[li.subjectId].studentCount += 1;
+        if (li.status === 'paid') {
+          subjectStatsMap[li.subjectId].paidCount += 1;
+        }
+      });
+    });
+
+    return {
+      total,
+      paid,
+      debt,
+      isAllSettled,
+      fullyPaidCount,
+      partialCount,
+      unpaidCount,
+      subjectBreakdown: Object.values(subjectStatsMap),
+    };
+  }, [settlementMonthInvoices]);
 
   const handleQuickExport = (type: 'all' | 'paid' | 'debt') => {
     exportTuitionStudentsExcel(students, invoices, {
       filterType: type,
       grade: selectedGrade,
-      month: 8,
-      year: 2026,
+      month: selectedMonth === 'all' ? 8 : selectedMonth,
+      year: selectedYear,
     });
     confetti({
       particleCount: 50,
       spread: 60,
       origin: { y: 0.6 },
     });
+  };
+
+  const handleExportSettlementExcel = () => {
+    const m = selectedMonth === 'all' ? 8 : selectedMonth;
+    const fileName = exportMonthlySettlementExcel(invoices, m, selectedYear);
+    confetti({
+      particleCount: 60,
+      spread: 60,
+      origin: { y: 0.6 },
+    });
+    alert(`Đã xuất báo cáo quyết toán Tháng ${m}/${selectedYear} thành công vào tệp ${fileName}!`);
+  };
+
+  const handleSettleMonth = () => {
+    const m = selectedMonth === 'all' ? 8 : selectedMonth;
+    if (window.confirm(`Xác nhận Khóa Sổ & Quyết Toán Học Phí Tháng ${m}/${selectedYear}? Toàn bộ hóa đơn trong tháng sẽ được đánh dấu đã quyết toán.`)) {
+      settleMonthlyInvoices(m, selectedYear);
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+      alert(`Đã hoàn tất quyết toán tài chính Tháng ${m}/${selectedYear}!`);
+    }
   };
 
   const handleBatchCopyZaloReminders = () => {
@@ -168,8 +266,9 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
       return;
     }
 
+    const currentM = selectedMonth === 'all' ? 8 : selectedMonth;
     const content = [
-      `📢 DANH SÁCH THÔNG BÁO HỌC PHÍ THÁNG 8/2026 - AN TÂM EDUCATION`,
+      `📢 DANH SÁCH THÔNG BÁO HỌC PHÍ THÁNG ${currentM}/${selectedYear} - AN TÂM EDUCATION`,
       `Tổng số học sinh còn nợ: ${list.length} | Tổng tiền: ${formatCurrency(totalDebt)}`,
       `----------------------------------------`,
       ...list.map(
@@ -177,18 +276,38 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
           `${idx + 1}. Em ${inv.studentName} (${inv.studentCode}) - Khối ${inv.grade}\n   • Số tiền cần đóng: ${formatCurrency(inv.remainingAmount)} (Đã nộp: ${formatCurrency(inv.paidAmount)})\n   • Hạn nộp: ${inv.dueDate}\n   • Trạng thái: ${inv.status === 'overdue' ? 'ĐÃ QUÁ HẠN' : 'Chờ thanh toán'}`
       ),
       `----------------------------------------`,
-      `STK nhận học phí: MBBank 0988112201 - AN TAM EDUCATION (Cú pháp: [Mã HS] HP T8)`,
-    ].join('\n');
+      `STK nhận học phí: MBBank 0988112201 - AN TAM EDUCATION (Cú pháp: [Mã HS] HP T${currentM})`,
+    ];
 
-    navigator.clipboard.writeText(content);
+    navigator.clipboard.writeText(content.join('\n'));
     setCopiedBatchZalo(true);
     setTimeout(() => setCopiedBatchZalo(false), 3000);
   };
 
   const handleCopyZaloMessage = (inv: InvoiceRecord) => {
-    const msg = `Kính gửi Quý phụ huynh học sinh ${inv.studentName} (${inv.studentCode}),\nAN TÂM EDUCATION xin thông báo học phí tháng ${inv.month}/${inv.year}:\n- Tổng học phí: ${inv.totalAmount.toLocaleString()}đ\n- Đã nộp: ${inv.paidAmount.toLocaleString()}đ\n- Số tiền cần đóng: ${inv.remainingAmount.toLocaleString()}đ\n- Hạn thanh toán: ${inv.dueDate}\n\nQuý phụ huynh vui lòng chuyển khoản theo thông tin:\nNgân hàng: MBBank (Quân Đội)\nSTK: 0988112201 (AN TÂM EDUCATION)\nNội dung: ${inv.studentCode} HP T${inv.month}\nXin trân trọng cảm ơn!`;
-    navigator.clipboard.writeText(msg);
-    alert(`Đã sao chép tin nhắn nhắc học phí cho học sinh ${inv.studentName}! Bạn có thể dán trực tiếp vào Zalo.`);
+    const lines = [
+      `Kính gửi Quý phụ huynh học sinh ${inv.studentName} (${inv.studentCode}) - Khối ${inv.grade},`,
+      `Trung tâm AN TÂM EDUCATION xin gửi thông báo học phí Tháng ${inv.month}/${inv.year}:`,
+      `• Tổng học phí các môn: ${formatCurrency(inv.totalAmount)}`,
+      `• Đã nộp: ${formatCurrency(inv.paidAmount)}`,
+      `• Còn nợ cần thanh toán: ${formatCurrency(inv.remainingAmount)}`,
+      `• Hạn nộp: ${inv.dueDate}`,
+      `Chi tiết các môn:`,
+      ...inv.lineItems.map(
+        (li) =>
+          `  - ${li.subjectName}: ${formatCurrency(li.amount)} (Đã nộp: ${formatCurrency(li.paidAmount || 0)}${
+            li.paidDate ? ` - Ngày nộp: ${li.paidDate}` : ''
+          })`
+      ),
+      `------------------------`,
+      `Thông tin thanh toán:`,
+      `Ngân hàng MBBank: STK 0988112201 - Chủ TK: AN TAM EDUCATION`,
+      `Nội dung: AT ${inv.studentCode} HP T${inv.month}`,
+      `Trân trọng cảm ơn Quý phụ huynh!`,
+    ];
+
+    navigator.clipboard.writeText(lines.join('\n'));
+    alert(`Đã sao chép tin nhắn nhắc học phí Zalo cho phụ huynh em ${inv.studentName}!`);
   };
 
   const handlePrintReceipt = (inv: InvoiceRecord) => {
@@ -196,10 +315,24 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
     setIsPrintModalOpen(true);
   };
 
+  const handleGenerateNewMonthInvoices = (e: React.FormEvent) => {
+    e.preventDefault();
+    const count = createMonthlyInvoices(genMonth, genYear, genDueDate);
+    setIsGenModalOpen(false);
+    confetti({
+      particleCount: 70,
+      spread: 60,
+      origin: { y: 0.6 },
+    });
+    alert(`Đã tạo thành công ${count} hóa đơn học phí mới cho Tháng ${genMonth}/${genYear}!`);
+    setSelectedMonth(genMonth);
+    setSelectedYear(genYear);
+  };
+
   const handleAddCustomSubject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubjectName.trim()) return;
-    
+
     if (editingSubjectId) {
       updateSubject(editingSubjectId, {
         name: newSubjectName.trim(),
@@ -219,7 +352,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
       });
       alert(`Đã thêm môn học ${newSubjectName.trim()} thành công!`);
     }
-    
+
     setNewSubjectName('');
     setEditingSubjectId(null);
     setIsSubjectModalOpen(false);
@@ -233,36 +366,119 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
             <span>Tài Chính</span>
             <span>/</span>
-            <span className="text-slate-700">Học Phí & Công Nợ</span>
+            <span className="text-slate-700">Học Phí, Thu Theo Môn & Quyết Toán</span>
           </div>
           <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2 mt-1">
             <CreditCard className="w-6 h-6 text-indigo-600" />
-            <span>TÀI CHÍNH HỌC PHÍ & QUẢN LÝ CÔNG NỢ</span>
+            <span>TÀI CHÍNH HỌC PHÍ & QUYẾT TOÁN THEO THÁNG</span>
           </h1>
           <p className="text-xs lg:text-sm text-slate-500 mt-0.5">
-            Quản lý hóa đơn thu học phí, lịch sử giao dịch, cảnh báo nợ & xuất báo cáo Excel chuyên nghiệp
+            Thu học phí từng môn riêng biệt kèm ngày nộp, nộp tổng trọn gói, và quyết toán tài chính định kỳ theo tháng
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Sync Academic Data Button */}
+          <button
+            onClick={() => {
+              if (syncAcademicToOperations) {
+                const res = syncAcademicToOperations();
+                confetti({
+                  particleCount: 50,
+                  spread: 60,
+                  origin: { y: 0.6 },
+                });
+              }
+            }}
+            title="Đồng bộ danh sách môn học, học sinh từ phần Học Tập sang Hóa Đơn & Tài Chính"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Đồng Bộ Học Tập ({students.length} HS)</span>
+          </button>
+
+          {/* Create Monthly Invoices Button */}
+          <button
+            onClick={() => setIsGenModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+          >
+            <Calendar className="w-4 h-4 text-white" />
+            <span>Tạo Hóa Đơn Tháng Mới</span>
+          </button>
+
           {/* Main Excel Export Trigger */}
           <button
             onClick={() => {
               setExportInitialType('all');
               setIsExportModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs lg:text-sm font-bold shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs lg:text-sm font-bold shadow-md shadow-emerald-950/20 transition-all cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>Xuất Excel Danh Sách Học Phí</span>
+            <span>Xuất Excel Danh Sách</span>
           </button>
 
           <button
             onClick={() => setIsSubjectModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Settings className="w-4 h-4 text-indigo-600" />
             <span>Cấu Hình Học Phí</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Month / Period Filter Strip */}
+      <div className="p-3 rounded-2xl bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-2 text-xs">
+          <Calendar className="w-4 h-4 text-indigo-400" />
+          <span className="font-bold uppercase tracking-wider text-slate-300">Kỳ Học Phí:</span>
+          <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl border border-slate-700">
+            {[8, 9, 10, 11, 12].map((m) => (
+              <button
+                key={m}
+                onClick={() => setSelectedMonth(m)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedMonth === m
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Tháng {m}
+              </button>
+            ))}
+            <button
+              onClick={() => setSelectedMonth('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedMonth === 'all'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Tất cả
+            </button>
+          </div>
+          <span className="text-slate-400 font-mono text-xs">Năm {selectedYear}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs">
+          {settlementStats.isAllSettled ? (
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold text-[11px]">
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Tháng {selectedMonth === 'all' ? 8 : selectedMonth} đã quyết toán</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold text-[11px]">
+              <Unlock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Tháng {selectedMonth === 'all' ? 8 : selectedMonth} đang thu & quyết toán</span>
+            </span>
+          )}
+
+          <button
+            onClick={() => setActiveTab('settlement')}
+            className="px-3 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs cursor-pointer shadow-xs"
+          >
+            Xem Quyết Toán Tháng 📊
           </button>
         </div>
       </div>
@@ -271,14 +487,14 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2 relative overflow-hidden">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            <span>Tổng Phải Thu (Tháng 8)</span>
+            <span>Tổng Phải Thu (T{selectedMonth === 'all' ? 'Tất cả' : selectedMonth})</span>
             <DollarSign className="w-4 h-4 text-indigo-600" />
           </div>
           <div className="text-3xl font-bold text-slate-900">
             {formatCurrency(totalDue)}
           </div>
           <div className="text-[11px] text-slate-500 flex items-center justify-between">
-            <span>{invoices.length} hóa đơn học sinh</span>
+            <span>{filtered.length} hóa đơn học sinh</span>
             <button
               onClick={() => handleQuickExport('all')}
               className="text-indigo-600 hover:underline font-bold cursor-pointer"
@@ -339,7 +555,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              Tất Cả Hóa Đơn ({invoices.length})
+              Tất Cả Hóa Đơn & Môn ({filtered.length})
             </button>
 
             <button
@@ -352,6 +568,18 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Học Sinh Còn Nợ ({debtorsList.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('settlement')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'settlement'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-emerald-700 hover:bg-emerald-50'
+              }`}
+            >
+              <PieChart className="w-3.5 h-3.5" />
+              <span>Quyết Toán Tháng {selectedMonth === 'all' ? 8 : selectedMonth}</span>
             </button>
 
             <button
@@ -389,7 +617,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
         </div>
 
         {/* Search & Status Filter & Grade Selector */}
-        {activeTab !== 'pricing' && (
+        {activeTab !== 'pricing' && activeTab !== 'settlement' && (
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
             <div className="relative sm:col-span-6">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -397,7 +625,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm mã hóa đơn, tên học sinh, mã HS..."
+                placeholder="Tìm mã hóa đơn, tên học sinh, mã HS, môn học..."
                 className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs lg:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               />
             </div>
@@ -483,7 +711,163 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
       </div>
 
       {/* Main Tab Content */}
-      {activeTab === 'pricing' ? (
+      {activeTab === 'settlement' ? (
+        /* TAB: MONTHLY SETTLEMENT DASHBOARD */
+        <div className="space-y-5">
+          {/* Settlement Top Card */}
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-slate-900">
+                    Báo Cáo Quyết Toán Học Phí Tháng {selectedMonth === 'all' ? 8 : selectedMonth}/{selectedYear}
+                  </h2>
+                  {settlementStats.isAllSettled ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1">
+                      <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Đã Khóa Sổ & Quyết Toán</span>
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Đang Thu & Quyết Toán</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Bảng tổng hợp thu chi học phí theo từng môn học, tỷ lệ hoàn tất nộp tiền và chốt sổ kỳ thu
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportSettlementExcel}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Xuất Excel Quyết Toán</span>
+                </button>
+
+                {!settlementStats.isAllSettled && (
+                  <button
+                    type="button"
+                    onClick={handleSettleMonth}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Khóa Sổ & Quyết Toán Tháng</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 4 Summary Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[11px] text-slate-500 font-medium">Học Phí Dự Thu:</div>
+                <div className="text-lg font-bold text-slate-900 mt-0.5">{formatCurrency(settlementStats.total)}</div>
+                <div className="text-[10px] text-slate-400 mt-1">{settlementMonthInvoices.length} học sinh đăng ký</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                <div className="text-[11px] text-emerald-700 font-medium">Đã Thu Thực Tế:</div>
+                <div className="text-lg font-bold text-emerald-600 mt-0.5">{formatCurrency(settlementStats.paid)}</div>
+                <div className="text-[10px] text-emerald-700 mt-1">{settlementStats.fullyPaidCount} HS đóng đủ 100%</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200">
+                <div className="text-[11px] text-rose-700 font-medium">Công Nợ Chưa Thu:</div>
+                <div className="text-lg font-bold text-rose-600 mt-0.5">{formatCurrency(settlementStats.debt)}</div>
+                <div className="text-[10px] text-rose-600 mt-1">{settlementStats.unpaidCount + settlementStats.partialCount} HS còn nợ</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200">
+                <div className="text-[11px] text-indigo-700 font-medium">Tỷ Lệ Thu Hồi:</div>
+                <div className="text-lg font-bold text-indigo-700 mt-0.5">
+                  {((settlementStats.paid / (settlementStats.total || 1)) * 100).toFixed(1)}%
+                </div>
+                <div className="text-[10px] text-indigo-600 mt-1">
+                  {settlementStats.fullyPaidCount}/{settlementMonthInvoices.length} hóa đơn hoàn tất
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Per-Subject Settlement Breakdown Table */}
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-base font-bold text-slate-900">
+                  Quyết Toán Chi Tiết Từng Môn Học (Tháng {selectedMonth === 'all' ? 8 : selectedMonth})
+                </h3>
+              </div>
+              <span className="text-xs text-slate-500">
+                {settlementStats.subjectBreakdown.length} môn học đang mở lớp
+              </span>
+            </div>
+
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+              <table className="w-full text-left text-xs lg:text-sm text-slate-700">
+                <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3">Môn Học</th>
+                    <th className="px-4 py-3 text-center">Số HS Học</th>
+                    <th className="px-4 py-3 text-center">Đã Đóng Đủ</th>
+                    <th className="px-4 py-3">Tổng Dự Thu</th>
+                    <th className="px-4 py-3">Đã Thu Thực Tế</th>
+                    <th className="px-4 py-3">Còn Nợ</th>
+                    <th className="px-4 py-3 text-center">Tỷ Lệ Thu</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {settlementStats.subjectBreakdown.map((sub, idx) => {
+                    const subDebt = Math.max(0, sub.totalDue - sub.totalPaid);
+                    const rate = ((sub.totalPaid / (sub.totalDue || 1)) * 100).toFixed(1);
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-4 py-3.5 font-bold text-slate-900 flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
+                          <span>{sub.name}</span>
+                        </td>
+                        <td className="px-4 py-3.5 text-center font-medium text-slate-700">
+                          {sub.studentCount} HS
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-xs">
+                            {sub.paidCount} / {sub.studentCount}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 font-semibold text-slate-900">
+                          {formatCurrency(sub.totalDue)}
+                        </td>
+                        <td className="px-4 py-3.5 font-bold text-emerald-600">
+                          {formatCurrency(sub.totalPaid)}
+                        </td>
+                        <td className="px-4 py-3.5 font-semibold text-rose-600">
+                          {subDebt > 0 ? formatCurrency(subDebt) : '0 ₫'}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <div className="inline-flex items-center gap-1.5">
+                            <div className="w-16 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
+                              <div
+                                className="bg-emerald-500 h-full rounded-full"
+                                style={{ width: `${Math.min(100, Number(rate))}%` }}
+                              />
+                            </div>
+                            <span className="text-[11px] font-bold text-slate-700">{rate}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'pricing' ? (
         /* Pricing & Subjects Table */
         <div className="rounded-xl bg-white border border-slate-200 p-5 space-y-5 shadow-xs">
           {/* Subheader and Controls */}
@@ -494,7 +878,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                 Điều chỉnh học phí chuẩn của môn học hoặc cấu hình mức giá riêng biệt theo từng khối lớp (K6 - K12)
               </p>
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
                 <button
@@ -529,6 +913,18 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
             </div>
           </div>
 
+          {/* Auto-Sync Notice */}
+          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex items-center justify-between gap-3 text-emerald-900">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="font-semibold">Đồng bộ tự động:</span>
+              <span className="text-emerald-800">Mọi thay đổi biểu phí môn học sẽ lập tức áp dụng và tính lại học phí, công nợ cho toàn bộ học sinh đang theo học theo đúng khối lớp.</span>
+            </div>
+            <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 text-[10px] font-extrabold uppercase">
+              Tự Động 100%
+            </span>
+          </div>
+
           {pricingSubTab === 'standard' ? (
             /* Sub-tab 1: Standard Tuition Table with Edit Action */
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
@@ -548,22 +944,25 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                       <td className="px-4 py-3.5 font-bold text-slate-900 flex items-center gap-2.5">
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: sub.color }}
+                          style={{ backgroundColor: sub.color || '#3B82F6' }}
                         />
                         <span>{sub.name}</span>
                       </td>
-                      <td className="px-4 py-3.5 font-mono text-slate-500 font-bold">{sub.code}</td>
-                      <td className="px-4 py-3.5 text-xs text-slate-500 max-w-xs truncate">{sub.description || 'Môn học bồi dưỡng'}</td>
-                      <td className="px-4 py-3.5 text-indigo-700 font-bold font-mono">
+                      <td className="px-4 py-3.5 font-mono text-xs font-semibold text-slate-600">
+                        {sub.code}
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-500">
+                        {sub.description || 'Chương trình tiêu chuẩn'}
+                      </td>
+                      <td className="px-4 py-3.5 font-bold text-indigo-700">
                         {formatCurrency(sub.defaultFee)}
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <button
                           onClick={() => handleOpenEditSubject(sub)}
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-semibold border border-indigo-200/50 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                          className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
                         >
-                          <Settings className="w-3.5 h-3.5" />
-                          <span>Chỉnh Sửa</span>
+                          Sửa mức phí
                         </button>
                       </td>
                     </tr>
@@ -572,36 +971,41 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
               </table>
             </div>
           ) : (
-            /* Sub-tab 2: Grade-Specific Adjustable Matrix/Table */
+            /* Sub-tab 2: Grade-Adjusted Tuition Matrix */
             <div className="space-y-4">
-              {/* Inner Grade Selector */}
-              <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                <span className="text-xs text-slate-500 font-bold px-2 uppercase tracking-wider">CHỌN KHỐI LỚP ĐỂ ĐIỀU CHỈNH:</span>
-                {[6, 7, 8, 9].map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => setEditingGrade(g)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                      editingGrade === g
-                        ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
-                    }`}
-                  >
-                    Khối {g}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                  <span>Chọn Khối Lớp Để Tùy Chỉnh:</span>
+                  <div className="flex gap-1">
+                    {[6, 7, 8, 9].map((g) => (
+                      <button
+                        key={g}
+                        onClick={() => setEditingGrade(g)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                          editingGrade === g
+                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        Khối {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-500">
+                  Đang chỉnh sửa mức học phí cho: <strong className="text-indigo-700">Khối {editingGrade}</strong>
+                </div>
               </div>
 
-              {/* Subject Adjustment List */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
                 <table className="w-full text-left text-xs lg:text-sm text-slate-700">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3">Môn Học</th>
-                      <th className="px-4 py-3">Mã Môn</th>
-                      <th className="px-4 py-3">Mức Học Phí Mặc Định</th>
-                      <th className="px-4 py-3">Mức Học Phí Khối {editingGrade}</th>
-                      <th className="px-4 py-3 text-center">Trạng Thái Áp Dụng</th>
+                      <th className="px-4 py-3">Học Phí Chuẩn Gốc</th>
+                      <th className="px-4 py-3">Học Phí Áp Dụng Khối {editingGrade} (VNĐ)</th>
+                      <th className="px-4 py-3 text-center">Trạng Thái</th>
                       <th className="px-4 py-3 text-right">Thao Tác</th>
                     </tr>
                   </thead>
@@ -609,43 +1013,54 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                     {subjects.map((sub) => {
                       const hasOverride = sub.gradeFees && sub.gradeFees[editingGrade] !== undefined;
                       const activeFee = hasOverride ? sub.gradeFees![editingGrade] : sub.defaultFee;
-                      const inputValue = feeInputs[sub.id] || '';
 
                       return (
                         <tr key={sub.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-slate-900 flex items-center gap-2.5">
+                          <td className="px-4 py-3 font-bold text-slate-900 flex items-center gap-2.5">
                             <span
-                              className="w-2.5 h-2.5 rounded-full"
-                              style={{ backgroundColor: sub.color }}
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: sub.color || '#3B82F6' }}
                             />
                             <span>{sub.name}</span>
                           </td>
-                          <td className="px-4 py-3 font-mono text-slate-500 font-bold">{sub.code}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatCurrency(sub.defaultFee)} / tháng</td>
-                          
-                          {/* Input Field for override */}
+
+                          <td className="px-4 py-3 text-slate-500 font-mono">
+                            {formatCurrency(sub.defaultFee)}
+                          </td>
+
+                          {/* Editable Price Input for this Grade */}
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-2 max-w-[160px]">
+                            <div className="flex items-center gap-2">
                               <input
                                 type="number"
-                                value={inputValue}
-                                onChange={(e) => setFeeInputs(prev => ({ ...prev, [sub.id]: e.target.value }))}
-                                placeholder={String(sub.defaultFee)}
-                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 bg-white"
+                                step="50000"
+                                placeholder={`Mặc định (${sub.defaultFee})`}
+                                value={feeInputs[sub.id] !== undefined ? feeInputs[sub.id] : ''}
+                                onChange={(e) =>
+                                  setFeeInputs((prev) => ({
+                                    ...prev,
+                                    [sub.id]: e.target.value,
+                                  }))
+                                }
+                                className={`w-40 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                                  hasOverride
+                                    ? 'border-indigo-400 bg-indigo-50/40 text-indigo-900'
+                                    : 'border-slate-300 bg-white text-slate-700'
+                                }`}
                               />
-                              <span className="text-slate-400 font-semibold text-xs">₫</span>
+                              <span className="text-[11px] text-slate-400">₫/tháng</span>
                             </div>
                           </td>
 
                           {/* Status Badge */}
                           <td className="px-4 py-3 text-center">
                             {hasOverride ? (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold border border-indigo-200">
                                 Đã điều chỉnh ({formatShortCurrency(activeFee)})
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                                Mặc định chuẩn
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium border border-slate-200">
+                                Theo chuẩn gốc
                               </span>
                             )}
                           </td>
@@ -676,23 +1091,11 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                   </tbody>
                 </table>
               </div>
-
-              {/* Dynamic Information Banner */}
-              <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-900 text-xs space-y-1">
-                <h4 className="font-bold flex items-center gap-1">
-                  💡 Hướng dẫn cấu hình học phí theo Khối lớp:
-                </h4>
-                <ul className="list-disc list-inside space-y-1 pl-1 text-slate-600 leading-relaxed font-normal">
-                  <li><strong>Học phí mặc định:</strong> Khi học sinh mới đăng ký, hệ thống sẽ sử dụng mức học phí chuẩn của môn học.</li>
-                  <li><strong>Điều chỉnh theo Khối:</strong> Khi bạn nhập số tiền học phí cụ thể cho một Khối (ví dụ: 1,200,000đ cho Toán Khối 9) và ấn <strong>"Lưu áp dụng"</strong>, bất kỳ học sinh nào thuộc Khối đó khi đăng ký môn Toán sẽ tự động áp dụng mức học phí 1,200,000đ thay vì mức 1,000,000đ chuẩn.</li>
-                  <li>Để quay lại mức mặc định, chỉ cần xóa trắng ô nhập liệu và nhấn <strong>"Lưu áp dụng"</strong> hoặc nhấn nút <strong>"Đặt lại"</strong>.</li>
-                </ul>
-              </div>
             </div>
           )}
         </div>
       ) : (
-        /* Invoices & Debtors Table */
+        /* Invoices & Debtors Table (With Granular Per-Subject Breakdown & Paid Dates) */
         <div className="rounded-xl bg-white border border-slate-200 overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs lg:text-sm text-slate-700">
@@ -700,7 +1103,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                 <tr>
                   <th className="px-4 py-3.5">Mã HĐ / Học Sinh</th>
                   <th className="px-3 py-3.5">Khối</th>
-                  <th className="px-4 py-3.5">Chi Tiết Môn Đăng Ký</th>
+                  <th className="px-4 py-3.5 min-w-[280px]">Chi Tiết Từng Môn & Ngày Nộp</th>
                   <th className="px-3 py-3.5">Tổng Phải Thu</th>
                   <th className="px-3 py-3.5">Đã Nộp</th>
                   <th className="px-3 py-3.5">Còn Nợ</th>
@@ -712,7 +1115,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
-                      Không tìm thấy hóa đơn nào phù hợp.
+                      Không tìm thấy hóa đơn nào phù hợp trong kỳ đã chọn.
                     </td>
                   </tr>
                 ) : (
@@ -725,6 +1128,11 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                           <span className="text-indigo-600 font-semibold">{inv.invoiceCode}</span>
                           <span>•</span>
                           <span>{inv.studentCode}</span>
+                          {inv.isSettled && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-semibold">
+                              Quyết toán
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -733,17 +1141,79 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                         Khối {inv.grade}
                       </td>
 
-                      {/* Line items */}
+                      {/* Granular Per-Subject Payment Status, Amounts & Dates */}
                       <td className="px-4 py-3.5">
-                        <div className="flex flex-wrap gap-1 max-w-xs">
-                          {inv.lineItems.map((li, idx) => (
-                            <span
-                              key={idx}
-                              className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"
-                            >
-                              {li.subjectName} ({formatShortCurrency(li.amount)})
-                            </span>
-                          ))}
+                        <div className="space-y-1.5 min-w-[280px]">
+                          {inv.lineItems.map((li, idx) => {
+                            const lineAmount = li.amount || 0;
+                            const linePaid = li.paidAmount !== undefined ? li.paidAmount : (inv.status === 'paid' ? lineAmount : 0);
+                            const lineRemaining = li.remainingAmount !== undefined ? li.remainingAmount : Math.max(0, lineAmount - linePaid);
+                            const isPaid = lineRemaining === 0;
+                            const isPartial = linePaid > 0 && !isPaid;
+
+                            return (
+                              <div
+                                key={idx}
+                                className={`p-2 rounded-lg border text-[11px] transition-colors ${
+                                  isPaid
+                                    ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                                    : isPartial
+                                    ? 'bg-amber-50/70 border-amber-200 text-amber-950'
+                                    : 'bg-slate-50 border-slate-200 text-slate-700'
+                                }`}
+                              >
+                                {/* Header row: Subject Name + Total Subject Fee + Mode Tag */}
+                                <div className="flex items-center justify-between gap-2 font-medium">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-slate-900">{li.subjectName}</span>
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      ({formatShortCurrency(lineAmount)})
+                                    </span>
+                                  </div>
+
+                                  {li.paymentMode && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded font-medium bg-white/80 text-slate-600 border border-slate-200">
+                                      {li.paymentMode === 'per_subject' ? 'Từng môn' : 'Nộp tổng'}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Status & Amount & Paid Date details */}
+                                <div className="flex flex-wrap items-center justify-between gap-1.5 mt-1 pt-1 border-t border-slate-200/60 text-[10px]">
+                                  {isPaid ? (
+                                    <div className="flex items-center gap-1 font-semibold text-emerald-700">
+                                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      <span>Đã nộp đủ: <strong>{formatCurrency(linePaid || lineAmount)}</strong></span>
+                                    </div>
+                                  ) : isPartial ? (
+                                    <div className="flex items-center gap-1 font-semibold text-amber-700">
+                                      <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      <span>
+                                        Đã nộp: <strong>{formatCurrency(linePaid)}</strong> (Nợ: {formatCurrency(lineRemaining)})
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1 font-medium text-rose-600">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                                      <span>Chưa nộp (Nợ: {formatCurrency(lineRemaining)})</span>
+                                    </div>
+                                  )}
+
+                                  {/* Paid Date */}
+                                  {li.paidDate ? (
+                                    <div className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-2xs">
+                                      <Calendar className="w-2.5 h-2.5 text-indigo-500" />
+                                      <span>{li.paidDate}</span>
+                                    </div>
+                                  ) : (
+                                    !isPaid && (
+                                      <span className="text-[9px] text-slate-400 font-mono">Chưa thanh toán</span>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
 
@@ -828,6 +1298,84 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Create Invoices for New Month Modal */}
+      {isGenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-indigo-600" />
+                <span>Tạo Hóa Đơn Học Phí Tháng Mới</span>
+              </h2>
+              <button
+                onClick={() => setIsGenModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleGenerateNewMonthInvoices} className="space-y-3.5 text-xs lg:text-sm">
+              <p className="text-slate-600 text-xs leading-relaxed">
+                Hệ thống sẽ tự động tổng hợp danh sách môn học đăng ký của tất cả học sinh đang học và xuất hóa đơn tương ứng cho tháng mới.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1 text-xs">Tháng *</label>
+                  <select
+                    value={genMonth}
+                    onChange={(e) => setGenMonth(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500 font-bold"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+                      <option key={m} value={m}>Tháng {m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1 text-xs">Năm *</label>
+                  <input
+                    type="number"
+                    value={genYear}
+                    onChange={(e) => setGenYear(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 font-mono font-bold focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1 text-xs">Hạn Nộp Học Phí *</label>
+                <input
+                  type="date"
+                  value={genDueDate}
+                  onChange={(e) => setGenDueDate(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-800 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsGenModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  Tạo Hóa Đơn Hàng Loạt
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -949,7 +1497,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
         </div>
       )}
 
-      {/* Printable Receipt Modal */}
+      {/* Printable Receipt Modal with Per-Subject Payment Breakdown & Dates */}
       {isPrintModalOpen && selectedInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-xl text-slate-800">
@@ -999,13 +1547,24 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
                 </div>
               </div>
 
-              {/* Items */}
-              <div className="border-t border-slate-200 pt-2 space-y-1.5">
-                <div className="font-bold text-slate-800">Chi tiết các môn:</div>
+              {/* Items with Per-Subject Payment Date */}
+              <div className="border-t border-slate-200 pt-2 space-y-2">
+                <div className="font-bold text-slate-800">Chi tiết từng môn học:</div>
                 {selectedInvoice.lineItems.map((li, idx) => (
-                  <div key={idx} className="flex justify-between text-[11px]">
-                    <span>• {li.subjectName}</span>
-                    <span className="font-mono font-semibold">{formatCurrency(li.amount)}</span>
+                  <div key={idx} className="p-2 rounded bg-white border border-slate-200 text-[11px] space-y-0.5">
+                    <div className="flex justify-between font-semibold text-slate-900">
+                      <span>• {li.subjectName}</span>
+                      <span className="font-mono">{formatCurrency(li.amount)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-500">
+                      <span>
+                        Đã nộp: <strong className="text-emerald-600">{formatCurrency(li.paidAmount || 0)}</strong>
+                        {li.paidDate && ` (Ngày nộp: ${li.paidDate})`}
+                      </span>
+                      <span>
+                        Còn nợ: <strong className="text-rose-600">{formatCurrency(li.remainingAmount || 0)}</strong>
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1013,7 +1572,7 @@ export const FinanceManager: React.FC<FinanceManagerProps> = ({ onOpenPaymentMod
               {/* Total & Paid */}
               <div className="border-t border-slate-200 pt-2 space-y-1 text-xs">
                 <div className="flex justify-between font-bold text-slate-900">
-                  <span>Tổng cộng:</span>
+                  <span>Tổng học phí:</span>
                   <span>{formatCurrency(selectedInvoice.totalAmount)}</span>
                 </div>
                 <div className="flex justify-between text-emerald-700 font-bold">
