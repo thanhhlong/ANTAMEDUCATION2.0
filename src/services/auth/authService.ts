@@ -77,6 +77,8 @@ export function getFriendlyAuthErrorMessage(error: any): string {
       return 'Hành động này yêu cầu bạn phải đăng nhập lại gần đây.';
     case 'auth/network-request-failed':
       return 'Lỗi kết nối mạng. Vui lòng kiểm tra lại đường truyền internet.';
+    case 'auth/operation-not-allowed':
+      return 'Tính năng đăng nhập bằng [Email/Mật khẩu] chưa được kích hoạt trong dự án Firebase của bạn. Vui lòng truy cập Firebase Console > Authentication > Sign-in method và BẬT "Email/Password" để hoàn tất thiết lập hệ thống thực tế.';
     default:
       return error?.message || 'Đã xảy ra lỗi trong quá trình xác thực.';
   }
