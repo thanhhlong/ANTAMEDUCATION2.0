@@ -11,6 +11,19 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Correct working directory in IIS/Plesk iisnode to avoid relative path resolution bugs
+if (process.env.IISNODE_VERSION || process.platform === 'win32') {
+  if (process.cwd() !== __dirname) {
+    try {
+      process.chdir(__dirname);
+      console.log(`Working directory aligned with module path: ${__dirname}`);
+    } catch (e) {
+      console.error(`Failed to align working directory:`, e);
+    }
+  }
+}
+
 const startTime = Date.now();
 
 // In-memory runtime audit log buffer
@@ -358,14 +371,61 @@ Hãy giải đáp bằng tiếng Việt với phong cách sư phạm chuẩn m�
 
   const distPath = path.join(__dirname, 'dist');
   const hasDist = fs.existsSync(distPath) && fs.existsSync(path.join(distPath, 'index.html'));
+  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.IISNODE_VERSION;
 
   // Resilient production serving: serve compiled dist if present and not explicitly in development mode.
-  // This prevents HRESULT 0x2 / Access is denied Vite server start crashes on restricted hosts like Viettel.
-  if (hasDist && process.env.NODE_ENV !== 'development') {
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+  // This prevents HRESULT 0x2 / Access is denied Vite server start crashes on restricted hosts like Viettel or IIS/iisnode.
+  if (isProduction || (hasDist && process.env.NODE_ENV !== 'development')) {
+    if (hasDist) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      // Friendly Vietnamese error page for missing build folder under production
+      app.get('*', (req, res) => {
+        res.status(500).send(`
+          <!DOCTYPE html>
+          <html lang="vi">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Lỗi Khởi Động - ANTAM EDUCATION</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+              .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-width: 600px; width: 100%; border-top: 5px solid #ef4444; }
+              h1 { color: #dc2626; font-size: 24px; margin-top: 0; }
+              p { line-height: 1.6; font-size: 16px; }
+              code { background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 14px; color: #0f172a; display: block; margin: 10px 0; word-break: break-all; }
+              .steps { background: #fdf2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; margin-top: 20px; }
+              .steps h2 { font-size: 16px; margin: 0 0 10px 0; color: #991b1b; }
+              .steps ol { margin: 0; padding-left: 20px; }
+              .steps li { margin-bottom: 8px; font-size: 14px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>⚠️ Thiếu Thư Mục Bản Dựng (dist/)</h1>
+              <p>Hệ thống <strong>ANTAM EDUCATION 3.0</strong> phát hiện máy chủ đang chạy ở chế độ Production nhưng thư mục mã nguồn biên dịch <code>dist/</code> chưa tồn tại hoặc bị thiếu tệp <code>index.html</code>.</p>
+              
+              <div class="steps">
+                <h2>Hướng dẫn khắc phục:</h2>
+                <ol>
+                  <li>Mở Terminal/SSH trên hosting và chạy lệnh để biên dịch mã nguồn giao diện:
+                    <code>npm run build</code>
+                  </li>
+                  <li>Nếu bạn triển khai thủ công từ Git hoặc FTP, hãy đảm bảo thư mục cục bộ <code>dist/</code> đã được tải lên thư mục gốc của dự án trên hosting thành công.</li>
+                  <li>Nếu thư mục <code>dist/</code> đang bị ẩn bởi Git, hãy kiểm tra tệp <code>.gitignore</code> và bỏ qua việc chặn thư mục này trước khi đẩy (push) mã nguồn lên repository.</li>
+                  <li>Khởi động lại tiến trình Node.js/IIS AppPool để áp dụng thay đổi.</li>
+                </ol>
+              </div>
+              <p style="margin-top: 20px; font-size: 12px; color: #64748b; text-align: center;">Môi trường: ${process.env.NODE_ENV || 'production'} | IISNode: ${process.env.IISNODE_VERSION || 'Có'}</p>
+            </div>
+          </body>
+          </html>
+        `);
+      });
+    }
   } else {
     const vite = await createViteServer({
       server: { middlewareMode: true },
