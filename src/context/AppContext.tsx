@@ -41,6 +41,7 @@ import { ExcelImportResult } from '../utils/excelParser';
 import { cleanAndNormalizeAllData } from '../utils/dataCleaner';
 import { seedIfEmpty, saveDocument, deleteDocument, saveAllCollectionsToFirestore, fetchAllCollectionsFromFirestore } from '../services/firebase';
 import { logAuditEvent } from '../services/auditService';
+import { useAuth } from '../hooks/useAuth';
 
 interface AppContextType {
   // Authentication & Session
@@ -170,6 +171,7 @@ function safeGet<T>(key: string, defaultValue: T): T {
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const auth = useAuth();
   const [isLoadingFromCloud, setIsLoadingFromCloud] = useState<boolean>(true);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(false);
 
@@ -178,7 +180,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    return safeGet<AuthUser | null>(`${STORAGE_KEY}_currentUser`, null);
+    return auth.currentUser || safeGet<AuthUser | null>(`${STORAGE_KEY}_currentUser`, null);
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -186,8 +188,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState<boolean>(false);
 
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
-    return currentUser ? currentUser.role : 'SUPER_ADMIN';
+    return auth.currentUser ? auth.currentUser.role : (currentUser ? currentUser.role : 'SUPER_ADMIN');
   });
+
+  // Sync with auth.currentUser
+  useEffect(() => {
+    if (auth.currentUser) {
+      setCurrentUser(auth.currentUser);
+      setCurrentRole(auth.currentUser.role);
+    } else {
+      setCurrentUser(null);
+    }
+  }, [auth.currentUser]);
+
   const [selectedGrade, setSelectedGrade] = useState<number | 'all'>('all');
 
   const [students, setStudents] = useState<Student[]>(() => {
@@ -651,7 +664,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Vui lòng nhập email, số điện thoại hoặc mã học sinh' };
     }
 
-    // 1. Check in registered users list
+    let email = q;
+    let fallbackProfile: any = null;
+
+    // 1. Resolve email from users list
     let matchedUser = users.find(
       (u) =>
         u.email.toLowerCase() === q ||
@@ -660,8 +676,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (u.studentCode && u.studentCode.toLowerCase() === q)
     );
 
-    // 2. If not found in users list, check in students directory to allow immediate student/parent login
-    if (!matchedUser) {
+    if (matchedUser) {
+      email = matchedUser.email;
+      fallbackProfile = {
+        fullName: matchedUser.fullName,
+        role: matchedUser.role,
+        phone: matchedUser.phone,
+        title: matchedUser.title,
+        department: matchedUser.department,
+        grade: matchedUser.grade,
+        studentCode: matchedUser.studentCode,
+        assignedClasses: matchedUser.assignedClasses,
+        teachingSubjects: matchedUser.teachingSubjects,
+        isActive: matchedUser.isActive !== false
+      };
+    } else {
+      // 2. Resolve email from students list for on-the-fly login
       const studentMatch = students.find(
         (s) =>
           s.code.toLowerCase() === q ||
@@ -672,132 +702,114 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (studentMatch) {
         const isParent = studentMatch.parentPhone === q;
-        matchedUser = {
-          id: isParent ? `usr-parent-${studentMatch.id}` : `usr-student-${studentMatch.id}`,
-          username: isParent ? `ph.${studentMatch.code.toLowerCase()}` : `hs.${studentMatch.code.toLowerCase()}`,
-          email: isParent ? (studentMatch.parentEmail || `${studentMatch.code.toLowerCase()}@parent.antam.edu.vn`) : studentMatch.email,
-          phone: isParent ? studentMatch.parentPhone : studentMatch.phone,
+        const resolvedEmail = isParent 
+          ? (studentMatch.parentEmail || `${studentMatch.code.toLowerCase()}.parent@antam.edu.vn`)
+          : (studentMatch.email || `${studentMatch.code.toLowerCase()}@antam.edu.vn`);
+        
+        email = resolvedEmail;
+        fallbackProfile = {
           fullName: isParent ? studentMatch.parentName : studentMatch.fullName,
           role: isParent ? 'PARENT' : 'STUDENT',
+          phone: isParent ? studentMatch.parentPhone : studentMatch.phone,
           title: isParent
             ? `Phụ huynh em ${studentMatch.fullName} (${studentMatch.className})`
             : `Học sinh Lớp ${studentMatch.className} (Khối ${studentMatch.grade})`,
           grade: studentMatch.grade,
           studentCode: studentMatch.code,
-          password: '123',
-          createdAt: studentMatch.joinedDate || new Date().toISOString().split('T')[0],
-          lastLogin: new Date().toLocaleString('vi-VN'),
+          isActive: true
         };
-        // Add to users list
-        setUsers((prev) => [...prev, matchedUser!]);
       }
     }
 
-    if (!matchedUser) {
-      return { success: false, message: 'Không tìm thấy tài khoản với thông tin đã nhập' };
+    // Try logging in with real Firebase Auth
+    const loginResult = await auth.login(email, password || '123');
+    
+    if (loginResult.success) {
+      setIsAuthModalOpen(false);
+      setIsLoginPageView(false);
+      return { success: true, message: `Chào mừng quay trở lại!` };
     }
 
-    // Validate password if user has password set (allow demo password bypass)
-    if (password && matchedUser.password && matchedUser.password !== password && password !== '123' && password !== '123456') {
-      return { success: false, message: 'Mật khẩu không chính xác. Mật khẩu mẫu là 123 hoặc 123456' };
+    // If real Firebase Auth user doesn't exist yet but has local record, upgrade them on the fly!
+    if (fallbackProfile && (
+      loginResult.message?.includes('không chính xác') || 
+      loginResult.message?.includes('not-found') || 
+      loginResult.message?.includes('invalid-credential')
+    )) {
+      const defaultPassword = password || '123';
+      const registerResult = await auth.register(email, defaultPassword, fallbackProfile);
+      
+      if (registerResult.success) {
+        // Authenticate immediately with the newly registered account
+        await auth.login(email, defaultPassword);
+        setIsAuthModalOpen(false);
+        setIsLoginPageView(false);
+        return { 
+          success: true, 
+          message: `Chào mừng ${fallbackProfile.fullName}! Tài khoản của bạn đã được nâng cấp bảo mật Đám mây 3.0.` 
+        };
+      } else {
+        return { success: false, message: registerResult.message };
+      }
     }
 
-    const updatedUser = {
-      ...matchedUser,
-      lastLogin: new Date().toLocaleString('vi-VN'),
-    };
-
-    setCurrentUser(updatedUser);
-    setCurrentRole(updatedUser.role);
-    if (updatedUser.grade) {
-      setSelectedGrade(updatedUser.grade);
-    }
-    setIsAuthModalOpen(false);
-    setIsLoginPageView(false);
-
-    return { success: true, message: `Chào mừng ${updatedUser.fullName} quay trở lại!` };
+    return loginResult;
   };
 
   const loginUser = login;
 
-  const quickLoginAsRole = (role: UserRole) => {
+  const quickLoginAsRole = async (role: UserRole) => {
     const roleUser = users.find((u) => u.role === role) || INITIAL_AUTH_USERS.find((u) => u.role === role);
     if (roleUser) {
-      const updated = {
-        ...roleUser,
-        lastLogin: new Date().toLocaleString('vi-VN'),
-      };
-      setCurrentUser(updated);
-      setCurrentRole(role);
-      if (updated.grade) {
-        setSelectedGrade(updated.grade);
-      }
+      // For quick demo access, we log in using Firebase Auth or auto-register them
+      await login(roleUser.email, '123');
     } else {
       setCurrentRole(role);
     }
     setIsLoginPageView(false);
   };
 
-  const logout = () => {
-    setCurrentUser(null);
+  const logout = async () => {
+    await auth.logout();
     setIsLoginPageView(true);
     localStorage.removeItem(`${STORAGE_KEY}_currentUser`);
   };
 
   const registerUser = async (data: Omit<AuthUser, 'id' | 'createdAt'> & { password: string }): Promise<{ success: boolean; message?: string }> => {
-    const existing = users.find(
-      (u) => u.email.toLowerCase() === data.email.toLowerCase() || (data.phone && u.phone === data.phone)
-    );
-    if (existing) {
-      return { success: false, message: 'Email hoặc số điện thoại đã được đăng ký tài khoản khác' };
-    }
-
-    const newUser: AuthUser = {
-      ...data,
-      id: `usr-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
-      lastLogin: new Date().toLocaleString('vi-VN'),
+    const profile = {
+      fullName: data.fullName,
+      role: data.role,
+      phone: data.phone,
+      title: data.title,
+      department: data.department,
+      grade: data.grade,
+      studentCode: data.studentCode,
+      assignedClasses: data.assignedClasses,
+      teachingSubjects: data.teachingSubjects,
+      isActive: data.isActive !== false
     };
 
-    setUsers((prev) => [newUser, ...prev]);
-    setCurrentUser(newUser);
-    setCurrentRole(newUser.role);
-    if (newUser.grade) {
-      setSelectedGrade(newUser.grade);
+    const result = await auth.register(data.email, data.password, profile);
+    if (result.success) {
+      // Real sign-in immediately
+      await auth.login(data.email, data.password);
+      setIsAuthModalOpen(false);
+      return { success: true, message: 'Đăng ký tài khoản bảo mật thành công!' };
     }
-    setIsAuthModalOpen(false);
-
-    return { success: true, message: 'Tạo tài khoản và đăng nhập thành công!' };
+    return result;
   };
 
-  const updateUserProfile = (updates: Partial<AuthUser>) => {
-    if (!currentUser) return;
-    const updated = { ...currentUser, ...updates };
-    setCurrentUser(updated);
-    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+  const updateUserProfile = async (updates: Partial<AuthUser>) => {
+    await auth.updateProfile(updates);
   };
 
   const changePassword = async (oldPass: string, newPass: string): Promise<{ success: boolean; message?: string }> => {
-    if (!currentUser) return { success: false, message: 'Chưa đăng nhập' };
-    if (currentUser.password && currentUser.password !== oldPass && oldPass !== '123' && oldPass !== '123456') {
-      return { success: false, message: 'Mật khẩu cũ không chính xác' };
-    }
-    if (!newPass || newPass.length < 3) {
-      return { success: false, message: 'Mật khẩu mới phải có ít nhất 3 ký tự' };
-    }
-    updateUserProfile({ password: newPass });
-    return { success: true, message: 'Đổi mật khẩu thành công!' };
+    return auth.changePassword(oldPass, newPass);
   };
 
   // Permissions & Role Access Control
   const hasPermission = (permission: PermissionKey): boolean => {
-    if (!currentRole) return false;
-    if (currentRole === 'SUPER_ADMIN') return true;
-    if (currentUser?.customPermissions && currentUser.customPermissions.includes(permission)) {
-      return true;
-    }
-    const config = ROLE_PERMISSION_CONFIGS.find((c) => c.role === currentRole);
-    return config ? config.permissions.includes(permission) : false;
+    return auth.hasPermission(permission);
   };
 
   const addNewUser = (userData: Omit<AuthUser, 'id' | 'createdAt'>): AuthUser => {

@@ -359,7 +359,9 @@ Hãy giải đáp bằng tiếng Việt với phong cách sư phạm chuẩn m�
   const distPath = path.join(__dirname, 'dist');
   const hasDist = fs.existsSync(distPath) && fs.existsSync(path.join(distPath, 'index.html'));
 
-  if (process.env.NODE_ENV === 'production' && hasDist) {
+  // Resilient production serving: serve compiled dist if present and not explicitly in development mode.
+  // This prevents HRESULT 0x2 / Access is denied Vite server start crashes on restricted hosts like Viettel.
+  if (hasDist && process.env.NODE_ENV !== 'development') {
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
